@@ -158,8 +158,8 @@
   .play-btn:hover{ color:var(--accent); border-color:var(--accent-dim); }
   .play-btn:focus-visible{ outline:1.5px solid var(--accent); outline-offset:2px; }
   .timeline-track{ position:relative; flex:1; height:40px; }
-  .month-ticks{ position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; font-family:var(--mono); font-size:9.5px; color:var(--ink-faint); letter-spacing:.03em; padding:0 2px; }
-  .month-ticks span{ width:14px; text-align:center; }
+  .month-ticks{ position:absolute; top:0; left:0; right:0; height:13px; font-family:var(--mono); font-size:9.5px; color:var(--ink-faint); letter-spacing:.03em; }
+  .month-ticks span{ position:absolute; top:0; }
   .slider-rail{ position:absolute; top:24px; left:0; right:0; height:3px; background:var(--grid-strong); border-radius:3px; }
   .slider-fill{ position:absolute; top:24px; left:0; height:3px; background:var(--accent); border-radius:3px; width:0%; }
   input[type=range]#monthSlider{
@@ -183,7 +183,7 @@
     .sidebar{ width:100%; height:auto; top:auto; bottom:76px; border-left:0; border-top:1px solid var(--panel-border);
       max-height:44vh; padding-top:14px; }
     .sidebar h2{ padding:0 16px; }
-    .species-list{ display:flex; gap:6px; overflow-x:auto; padding:0 12px 4px; }
+    .species-list{ display:flex; gap:6px; overflow-x:auto; padding:0 12px 8px; flex:0 0 auto; }
     .species-row{ flex:0 0 auto; }
     .species-row .latin{ display:none; }
     .divider{ display:none; }
@@ -192,12 +192,14 @@
     .masthead{ padding:16px 16px 0; max-width:70vw; }
     .masthead h1{ font-size:18px; }
     .masthead p{ display:none; }
-    .legend{ left:16px; bottom:calc(44vh + 86px); max-width:180px; width:172px; padding:9px 12px 8px; }
-    .legend-labels span:nth-child(2){ display:none; }
+    /* no room for it once the sheet takes the lower half; the same scale is
+       explained on the index page, which also carries the data disclaimer */
+    .legend{ display:none; }
     .legend-note{ display:none; }
     .date-readout{ min-width:80px; font-size:10.5px; }
     .month-ticks{ font-size:8.5px; letter-spacing:0; }
-    .month-ticks span{ width:auto; }
+    .month-ticks span:not(:nth-child(3n+1)){ display:none; }
+    .species-row .common{ white-space:nowrap; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -244,8 +246,18 @@
   </button>
   <div class="timeline-track">
     <div class="month-ticks">
-      <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
-      <span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
+      <span style="left:0.0000%">Jan</span>
+      <span style="left:8.3333%">Feb</span>
+      <span style="left:16.6667%">Mar</span>
+      <span style="left:25.0000%">Apr</span>
+      <span style="left:33.3333%">May</span>
+      <span style="left:41.6667%">Jun</span>
+      <span style="left:50.0000%">Jul</span>
+      <span style="left:58.3333%">Aug</span>
+      <span style="left:66.6667%">Sep</span>
+      <span style="left:75.0000%">Oct</span>
+      <span style="left:83.3333%">Nov</span>
+      <span style="left:91.6667%">Dec</span>
     </div>
     <div class="slider-rail"></div>
     <div class="slider-fill" id="sliderFill"></div>
