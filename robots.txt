@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ellewitherow.github.io/flyway-atlas/sitemap.xml
+Sitemap: https://eauwith.github.io/flyway-atlas/sitemap.xml

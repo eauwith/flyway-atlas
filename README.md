@@ -49,11 +49,11 @@ they're safe to delete on other hosts.
 ## Before you go live
 
 **1. Domain — already set.** Canonical and `og:url` tags, `sitemap.xml` and `robots.txt`
-all point at <https://ellewitherow.github.io/flyway-atlas/>. If you move the site to
+all point at <https://eauwith.github.io/flyway-atlas/>. If you move the site to
 another host or a custom domain, update it everywhere at once:
 
 ```bash
-grep -rl 'ellewitherow.github.io/flyway-atlas' . | xargs sed -i '' 's|ellewitherow.github.io/flyway-atlas|yourdomain.com|g'
+grep -rl 'eauwith.github.io/flyway-atlas' . | xargs sed -i '' 's|eauwith.github.io/flyway-atlas|yourdomain.com|g'
 ```
 
 (Drop the `''` after `-i` on Linux.)
