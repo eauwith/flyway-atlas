@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flyway Atlas &middot; Following Summer</title>
+<meta name="description" content="An interactive migration map tracing six well-studied bird species between breeding and wintering grounds across the year.">
+<meta name="theme-color" content="#080b10">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Following Summer">
+<meta property="og:title" content="Flyway Atlas">
+<meta property="og:description" content="An interactive migration map tracing six well-studied bird species between breeding and wintering grounds across the year.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Flyway Atlas">
+<meta name="twitter:description" content="An interactive migration map tracing six well-studied bird species between breeding and wintering grounds across the year.">
+<link rel="canonical" href="https://ellewitherow.github.io/flyway-atlas/atlas.html">
+<meta property="og:url" content="https://ellewitherow.github.io/flyway-atlas/atlas.html">
+<!-- Add 1200x630 screenshots at assets/og-*.png, then uncomment:
+<meta property="og:image" content="https://ellewitherow.github.io/flyway-atlas/assets/og-atlas.png">
+<meta name="twitter:image" content="https://ellewitherow.github.io/flyway-atlas/assets/og-atlas.png">
+-->
+
+<style>
+  img{ max-width:100%; }
+  [hidden]{ display:none !important; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#080b10;
+    --bg-2:#0d131a;
+    --panel:#10161ded;
+    --panel-solid:#0f151cf5;
+    --panel-border:#26343d;
+    --ink:#eef4f1;
+    --ink-dim:#93a8ae;
+    --ink-faint:#54666c;
+    --gold:#cfa15f;
+    --accent:#4fc7b3;
+    --accent-dim:#2c5a52;
+    --land:#1c2732;
+    --land-line:#324352;
+    --grid:#1c262d;
+    --grid-strong:#334450;
+    --scale-lo:#2f6f8a;
+    --scale-mid:#3fc7b0;
+    --scale-hi:#e0a23c;
+    --scale-peak:#ff6a4d;
+    --serif-display:'Fraunces','Iowan Old Style','Palatino Linotype',serif;
+    --serif-body:'Newsreader','Iowan Old Style',Georgia,serif;
+    --mono:'IBM Plex Mono', ui-monospace,'SF Mono',Menlo,monospace;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--serif-body);
+    overflow:hidden; height:100dvh; width:100%;
+  }
+
+  .stage{ position:relative; width:100%; height:100dvh; overflow:hidden;
+    background:
+      radial-gradient(ellipse 70% 55% at 38% 45%, rgba(47,158,143,0.08), transparent 65%),
+      radial-gradient(ellipse 60% 45% at 75% 30%, rgba(207,161,95,0.05), transparent 65%),
+      linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 60%, #050708 100%);
+  }
+  canvas#map{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .markers{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .pin{ position:absolute; transform:translate(-50%,-100%); display:flex; flex-direction:column; align-items:center; }
+  .pin .stem{ width:2px; height:16px; background:linear-gradient(var(--pin-color), transparent); }
+  .pin .dot{ width:7px; height:7px; border-radius:50%; background:var(--pin-color); box-shadow:0 0 10px 3px var(--pin-color); margin-bottom:2px; }
+  .pin .tag{
+    font-family:var(--mono); font-size:10px; letter-spacing:.04em; white-space:nowrap;
+    color:var(--ink); background:rgba(8,11,16,0.72); padding:2px 7px; border-radius:4px;
+    margin-top:4px; border:1px solid rgba(255,255,255,0.08);
+  }
+
+  /* Masthead */
+  .masthead{ position:absolute; top:0; left:0; padding:26px 24px 0 28px; max-width:440px; pointer-events:none; }
+  .eyebrow{ font-family:var(--mono); font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin:0 0 9px; }
+  .masthead h1{ font-family:var(--serif-display); font-weight:500; font-size:clamp(22px,3vw,30px); line-height:1.1; margin:0 0 7px; text-wrap:balance; }
+  .masthead h1 em{ font-style:italic; font-weight:300; color:var(--gold); }
+  .masthead p{ font-size:13px; line-height:1.5; color:var(--ink-dim); margin:0; max-width:40ch; }
+
+  /* Sidebar */
+  .sidebar{
+    position:absolute; top:0; right:0; width:328px; height:100%;
+    background:var(--panel); border-left:1px solid var(--panel-border);
+    backdrop-filter:blur(8px);
+    display:flex; flex-direction:column;
+    padding:26px 0 0;
+  }
+  .sidebar h2{ font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 10px; padding:0 22px; }
+  .species-list{ list-style:none; margin:0; padding:0 10px; }
+  .species-row{
+    display:flex; align-items:center; gap:11px; width:100%;
+    background:none; border:0; text-align:left; cursor:pointer;
+    padding:9px 12px; border-radius:8px; color:var(--ink);
+    font-family:var(--serif-body);
+  }
+  .species-row:hover{ background:rgba(255,255,255,0.04); }
+  .species-row.active{ background:rgba(255,255,255,0.07); }
+  .species-row:focus-visible{ outline:1.5px solid var(--accent); outline-offset:-1px; }
+  .species-row .swatch{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:var(--sw); box-shadow:0 0 8px 1px var(--sw); }
+  .species-row .names{ display:flex; flex-direction:column; line-height:1.25; }
+  .species-row .common{ font-size:13.5px; }
+  .species-row .latin{ font-family:var(--mono); font-size:9.5px; color:var(--ink-faint); font-style:normal; }
+  .species-row.all .swatch{ background:conic-gradient(var(--scale-lo),var(--scale-mid),var(--scale-hi),var(--scale-peak),var(--scale-lo)); box-shadow:none; }
+
+  .divider{ height:1px; background:var(--panel-border); margin:14px 0; }
+
+  .info{ flex:1; overflow-y:auto; padding:0 22px 22px; }
+  .info .status-line{
+    font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--accent-dot,var(--accent)); margin:0 0 10px;
+  }
+  .info h3{ font-family:var(--serif-display); font-weight:600; font-size:22px; margin:0 0 3px; text-wrap:balance; }
+  .info .latin-full{ font-family:var(--serif-body); font-style:italic; color:var(--gold); font-size:13.5px; margin:0 0 14px; }
+  .info p.note{ font-size:14px; line-height:1.58; color:var(--ink-dim); margin:0 0 14px; }
+  .info .stat-box{
+    font-family:var(--mono); font-size:11.5px; line-height:1.55; color:var(--ink);
+    background:rgba(255,255,255,0.03); border:1px solid var(--panel-border);
+    border-radius:8px; padding:10px 12px; margin-bottom:14px;
+  }
+  .info .stat-box span{ display:block; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:3px; }
+  .info .route{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); line-height:1.7; }
+  .info .route b{ color:var(--ink); font-weight:500; }
+  .info .default-copy{ font-size:14.5px; line-height:1.6; color:var(--ink-dim); font-style:italic; font-family:var(--serif-body); }
+  .info .overview-stat{ font-family:var(--mono); font-size:11px; color:var(--accent); margin-top:16px; }
+
+  /* Legend */
+  .legend{
+    position:absolute; left:28px; bottom:92px; width:230px;
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
+    padding:12px 15px 11px; max-width:230px; backdrop-filter:blur(6px);
+  }
+  .legend h2{ font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 8px; }
+  .legend-bar{ height:6px; border-radius:4px; background:linear-gradient(90deg,var(--scale-lo),var(--scale-mid),var(--scale-hi),var(--scale-peak)); margin-bottom:5px; }
+  .legend-labels{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:9px; color:var(--ink-faint); }
+  .legend-note{ margin-top:8px; font-size:10.5px; color:var(--ink-faint); font-family:var(--serif-body); font-style:italic; line-height:1.4; }
+
+  /* Timeline bar */
+  .timebar{
+    position:absolute; left:0; bottom:0; right:328px; height:76px;
+    background:var(--panel); border-top:1px solid var(--panel-border);
+    backdrop-filter:blur(8px);
+    display:flex; align-items:center; gap:16px; padding:0 24px;
+  }
+  .play-btn{
+    width:38px; height:38px; border-radius:50%; flex:0 0 auto;
+    border:1px solid var(--panel-border); background:rgba(255,255,255,0.03);
+    color:var(--ink-dim); display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .play-btn:hover{ color:var(--accent); border-color:var(--accent-dim); }
+  .play-btn:focus-visible{ outline:1.5px solid var(--accent); outline-offset:2px; }
+  .timeline-track{ position:relative; flex:1; height:40px; }
+  .month-ticks{ position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; font-family:var(--mono); font-size:9.5px; color:var(--ink-faint); letter-spacing:.03em; padding:0 2px; }
+  .month-ticks span{ width:14px; text-align:center; }
+  .slider-rail{ position:absolute; top:24px; left:0; right:0; height:3px; background:var(--grid-strong); border-radius:3px; }
+  .slider-fill{ position:absolute; top:24px; left:0; height:3px; background:var(--accent); border-radius:3px; width:0%; }
+  input[type=range]#monthSlider{
+    position:absolute; top:14px; left:0; width:100%; height:24px; margin:0;
+    -webkit-appearance:none; appearance:none; background:transparent; cursor:pointer;
+  }
+  input[type=range]#monthSlider::-webkit-slider-thumb{
+    -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
+    background:var(--ink); border:2px solid var(--accent); margin-top:-6px;
+    box-shadow:0 0 10px 2px rgba(79,199,179,0.5);
+  }
+  input[type=range]#monthSlider::-moz-range-thumb{
+    width:15px; height:15px; border-radius:50%; background:var(--ink); border:2px solid var(--accent);
+    box-shadow:0 0 10px 2px rgba(79,199,179,0.5);
+  }
+  input[type=range]#monthSlider::-webkit-slider-runnable-track{ background:transparent; }
+  .date-readout{ font-family:var(--mono); font-size:12px; color:var(--ink); letter-spacing:.05em; min-width:108px; text-align:right; flex:0 0 auto; }
+  .date-readout .yr{ color:var(--ink-faint); font-size:9.5px; display:block; letter-spacing:.1em; }
+
+  @media (max-width: 860px){
+    .sidebar{ width:100%; height:auto; top:auto; bottom:76px; border-left:0; border-top:1px solid var(--panel-border);
+      max-height:44vh; padding-top:14px; }
+    .sidebar h2{ padding:0 16px; }
+    .species-list{ display:flex; gap:6px; overflow-x:auto; padding:0 12px 4px; }
+    .species-row{ flex:0 0 auto; }
+    .species-row .latin{ display:none; }
+    .divider{ display:none; }
+    .info{ padding:10px 16px 16px; }
+    .timebar{ right:0; height:70px; padding:0 14px; gap:10px; }
+    .masthead{ padding:16px 16px 0; max-width:70vw; }
+    .masthead h1{ font-size:18px; }
+    .masthead p{ display:none; }
+    .legend{ left:16px; bottom:calc(44vh + 86px); max-width:180px; width:172px; padding:9px 12px 8px; }
+    .legend-labels span:nth-child(2){ display:none; }
+    .legend-note{ display:none; }
+    .date-readout{ min-width:80px; font-size:10.5px; }
+    .month-ticks{ font-size:8.5px; letter-spacing:0; }
+    .month-ticks span{ width:auto; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    * { scroll-behavior:auto !important; }
+  }
+
+  /* site navigation back to the series index */
+  .home-link{ color:inherit; text-decoration:none; border-bottom:1px solid currentColor; padding-bottom:1px; pointer-events:auto; }
+  .home-link:hover{ color:var(--ink); }
+  .home-link:focus-visible{ outline:1.5px solid var(--accent); outline-offset:3px; border-radius:2px; }
+  .masthead{ pointer-events:none; }
+  .masthead .eyebrow{ pointer-events:auto; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="map"></canvas>
+  <div class="markers" id="markers"></div>
+</div>
+
+<div class="masthead">
+  <p class="eyebrow"><a class="home-link" href="index.html">Following Summer</a> &middot; Vol. II &middot; Six Lineages</p>
+  <h1>Where the <em>Migrants</em> Are</h1>
+  <p>A modelled radar of six well-tracked bird migrations, built from published satellite-tracking and range studies. Scrub the year to watch each lineage move between breeding and wintering ground.</p>
+</div>
+
+<div class="legend">
+  <h2>Population concentration</h2>
+  <div class="legend-bar"></div>
+  <div class="legend-labels"><span>Dispersed</span><span>Transit</span><span>Peak</span></div>
+  <p class="legend-note">Modelled from tracking studies &mdash; not a live radar feed.</p>
+</div>
+
+<aside class="sidebar">
+  <h2>Lineages</h2>
+  <ul class="species-list" id="speciesList"></ul>
+  <div class="divider" style="margin:14px 22px;"></div>
+  <div class="info" id="info"></div>
+</aside>
+
+<div class="timebar">
+  <button class="play-btn" id="playBtn" aria-label="Play year">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"></polygon></svg>
+  </button>
+  <div class="timeline-track">
+    <div class="month-ticks">
+      <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
+      <span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
+    </div>
+    <div class="slider-rail"></div>
+    <div class="slider-fill" id="sliderFill"></div>
+    <input type="range" id="monthSlider" min="0" max="1199" value="400" step="1" aria-label="Month of year">
+  </div>
+  <div class="date-readout" id="dateReadout"><span class="yr">MODELLED YEAR</span>Mid-April</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------------------------------------------------------
+   Geography: stylised continent silhouettes (lon,lat), equirectangular
+--------------------------------------------------------------- */
+const LON_MIN=-180, LON_MAX=180, LAT_MAX=85, LAT_MIN=-72;
+
+const CONTINENTS = [
+ { name:"north-america", pts:[[-168,66],[-155,71],[-125,74],[-95,73],[-80,67],[-85,58],[-95,50],[-80,45],
+   [-65,47],[-53,47],[-60,42],[-75,35],[-81,25],[-88,21],[-97,19],[-105,21],[-112,29],[-117,33],
+   [-122,38],[-124,47],[-130,54],[-145,60],[-160,60]] },
+ { name:"greenland", pts:[[-45,83],[-25,82],[-18,77],[-22,71],[-35,67],[-48,67],[-54,73],[-52,79]] },
+ { name:"south-america", pts:[[-77,9],[-72,5],[-60,5],[-50,1],[-35,-5],[-35,-15],[-40,-23],[-48,-25],
+   [-58,-34],[-68,-40],[-73,-45],[-72,-53],[-68,-55],[-65,-48],[-70,-30],[-70,-18],[-75,-5],[-80,2]] },
+ { name:"eurasia", pts:[[-9,36],[-10,44],[0,50],[5,60],[15,68],[35,70],[55,68],[70,73],[95,75],[125,73],
+   [148,66],[160,58],[170,52],[160,45],[145,40],[132,35],[122,31],[110,20],[100,10],[95,15],
+   [80,8],[77,10],[70,20],[60,25],[50,25],[45,15],[35,15],[33,32],[27,37],[19,40],[9,38],[0,38]] },
+ { name:"africa", pts:[[-17,21],[-10,30],[0,35],[10,37],[20,32],[32,31],[35,20],[43,12],[51,12],
+   [48,2],[42,-5],[40,-15],[35,-25],[30,-30],[20,-34],[15,-27],[12,-18],[10,-6],[8,4],[0,5],[-8,5],[-16,12]] },
+ { name:"australia", pts:[[113,-22],[122,-18],[130,-12],[137,-12],[142,-11],[148,-20],[153,-28],[150,-37],
+   [143,-39],[137,-35],[132,-32],[122,-34],[114,-30],[113,-26]] },
+ { name:"new-zealand", pts:[[172,-41],[174,-38],[176,-38],[178,-40],[176,-42],[173,-45],[171,-43]] },
+];
+
+const GRID_LINES = [
+ {lat:66.5, label:"66.5°N - ARCTIC CIRCLE"},
+ {lat:23.5, label:"23.5°N - TROPIC OF CANCER"},
+ {lat:0,    label:"EQUATOR"},
+ {lat:-23.5,label:"23.5°S - TROPIC OF CAPRICORN"},
+ {lat:-66.5,label:"66.5°S - ANTARCTIC CIRCLE"},
+];
+
+/* ---------------------------------------------------------------
+   Species: breeding / wintering ranges + seasonal timing
+--------------------------------------------------------------- */
+const SPECIES = [
+ { id:"tern", name:"Arctic Tern", latin:"Sterna paradisaea", color:"#ff6a4d",
+   breeding:{lon:-20,lat:74,name:"Greenland & the High Arctic"},
+   wintering:{lon:-15,lat:-68,name:"Antarctic pack ice"},
+   nb:[3.0,4.7], sb:[7.5,9.6],
+   distance:"~90,000 km round trip",
+   distanceNote:"the longest migration of any animal",
+   note:"Follows a winding route down the Atlantic, chasing near-perpetual daylight from one pole to the other." },
+ { id:"godwit", name:"Bar-tailed Godwit", latin:"Limosa lapponica baueri", color:"#e0a23c",
+   breeding:{lon:-155,lat:64,name:"Western Alaska"},
+   wintering:{lon:174,lat:-38,name:"North Island, New Zealand"},
+   nb:[2.7,4.3], sb:[8.7,9.4],
+   distance:"11,000+ km nonstop",
+   distanceNote:"the longest known nonstop flight of any bird",
+   note:"Crosses the entire Pacific in one 8-10 day flight, without landing, feeding, or drinking." },
+ { id:"hummingbird", name:"Ruby-throated Hummingbird", latin:"Archilochus colubris", color:"#d97fb0",
+   breeding:{lon:-78,lat:42,name:"Eastern North America"},
+   wintering:{lon:-84,lat:10,name:"Costa Rica & Central America"},
+   nb:[2.6,4.2], sb:[8.3,9.8],
+   distance:"~800 km nonstop",
+   distanceNote:"crossing open water at roughly 3 grams",
+   note:"Crosses the Gulf of Mexico in a single ~20-hour flight -- lighter than a coin." },
+ { id:"swallow", name:"Barn Swallow", latin:"Hirundo rustica", color:"#35a7c9",
+   breeding:{lon:12,lat:50,name:"Europe"},
+   wintering:{lon:26,lat:-26,name:"Southern Africa"},
+   nb:[3.2,4.8], sb:[8.2,9.7],
+   distance:"~10,000 km one-way",
+   distanceNote:"flown mostly by day, low over land",
+   note:"Travels by day at low altitude, often tracing coastlines and river valleys south." },
+ { id:"osprey", name:"Osprey", latin:"Pandion haliaetus", color:"#2f9e8f",
+   breeding:{lon:16,lat:61,name:"Scandinavia"},
+   wintering:{lon:-2,lat:6,name:"West Africa"},
+   nb:[2.8,4.1], sb:[7.6,9.1],
+   distance:"~7,000 km one-way",
+   distanceNote:"flown solo, without a parent to follow",
+   note:"Migrates alone, guided largely by an inherited sense of direction rather than a parent's lead." },
+ { id:"goose", name:"Snow Goose", latin:"Anser caerulescens", color:"#7c8fe0",
+   breeding:{lon:-95,lat:71,name:"Canadian Arctic"},
+   wintering:{lon:-94,lat:29,name:"Gulf Coast, USA"},
+   nb:[2.0,4.0], sb:[8.6,10.3],
+   distance:"~4,500 km one-way",
+   distanceNote:"flown in flocks tens of thousands strong",
+   note:"Travels in enormous honking flocks that can number in the tens of thousands." },
+];
+
+SPECIES.forEach(sp=>{
+  sp.keyframes = [
+    {m:0,pos:1},{m:sp.nb[0],pos:1},{m:sp.nb[1],pos:0},
+    {m:sp.sb[0],pos:0},{m:sp.sb[1],pos:1},{m:12,pos:1}
+  ];
+  sp.path = buildPath(sp);
+});
+
+function buildPath(sp){
+  let lonB=sp.breeding.lon, latB=sp.breeding.lat;
+  let lonW=sp.wintering.lon, latW=sp.wintering.lat;
+  const d = lonW-lonB;
+  if(d>180) lonW-=360; else if(d<-180) lonW+=360;
+  const dx=lonW-lonB, dy=latW-latB;
+  const len=Math.hypot(dx,dy)||1;
+  const nx=-dy/len, ny=dx/len;
+  const bow = len*0.16;
+  const midLon=(lonB+lonW)/2 + nx*bow;
+  const midLat=(latB+latW)/2 + ny*bow;
+  const N=72, pts=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const lon=(1-t)*(1-t)*lonB + 2*(1-t)*t*midLon + t*t*lonW;
+    const lat=(1-t)*(1-t)*latB + 2*(1-t)*t*midLat + t*t*latW;
+    pts.push({lon,lat,t});
+  }
+  return pts;
+}
+
+function posAt(sp, month){
+  const kf = sp.keyframes;
+  const m = ((month%12)+12)%12;
+  for(let i=0;i<kf.length-1;i++){
+    if(m>=kf[i].m && m<=kf[i+1].m){
+      const span = kf[i+1].m-kf[i].m || 1;
+      const t=(m-kf[i].m)/span;
+      return kf[i].pos + (kf[i+1].pos-kf[i].pos)*t;
+    }
+  }
+  return kf[kf.length-1].pos;
+}
+
+/* ---------------------------------------------------------------
+   Canvas + projection
+--------------------------------------------------------------- */
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+const markersLayer = document.getElementById('markers');
+
+let W=0,H=0,DPR=1, mapTop=0, mapLeft=0, mapW=0, mapH=0;
+
+function resize(){
+  const rect = stage.getBoundingClientRect();
+  W=rect.width; H=rect.height;
+  DPR=Math.min(2, window.devicePixelRatio||1);
+  canvas.width=W*DPR; canvas.height=H*DPR;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  // reserve room for sidebar/timebar on wide layouts so the map isn't hidden under them
+  const isNarrow = W<860;
+  const sidebarW = isNarrow ? 0 : 328;
+  // when narrow the sidebar becomes a bottom sheet over the map, so the
+  // drawable band ends above it rather than at the foot of the stage
+  const occludedBottom = isNarrow ? Math.round(H*0.44) + 70 : 100;
+  // an equirectangular map has fixed proportions; fit it inside the available
+  // box and centre it, rather than stretching it to whatever shape is left over
+  const boxLeft = 20, boxTop = isNarrow ? 66 : 96;
+  const boxW = W - sidebarW - boxLeft - 24;
+  const boxH = H - boxTop - occludedBottom;
+  const ratio = (LON_MAX-LON_MIN)/(LAT_MAX-LAT_MIN);
+  mapW = Math.min(boxW, boxH*ratio);
+  mapH = mapW/ratio;
+  mapLeft = boxLeft + (boxW-mapW)/2;
+  mapTop = boxTop + (boxH-mapH)/2;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function project(lon,lat){
+  const x = mapLeft + (lon-LON_MIN)/(LON_MAX-LON_MIN)*mapW;
+  const y = mapTop + (LAT_MAX-lat)/(LAT_MAX-LAT_MIN)*mapH;
+  return {x,y};
+}
+
+function drawSmoothClosed(points){
+  const n=points.length;
+  if(n<3) return;
+  ctx.beginPath();
+  ctx.moveTo((points[0].x+points[1].x)/2,(points[0].y+points[1].y)/2);
+  for(let i=0;i<n;i++){
+    const p0=points[(i-1+n)%n], p1=points[i], p2=points[(i+1)%n], p3=points[(i+2)%n];
+    const c1x=p1.x+(p2.x-p0.x)/6, c1y=p1.y+(p2.y-p0.y)/6;
+    const c2x=p2.x-(p3.x-p1.x)/6, c2y=p2.y-(p3.y-p1.y)/6;
+    ctx.bezierCurveTo(c1x,c1y,c2x,c2y,p2.x,p2.y);
+  }
+  ctx.closePath();
+}
+
+function drawContinents(){
+  CONTINENTS.forEach(c=>{
+    const pts = c.pts.map(([lon,lat])=>project(lon,lat));
+    drawSmoothClosed(pts);
+    ctx.fillStyle='var(--land)';
+    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--land').trim() || '#1c2732';
+    ctx.fill();
+    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--land-line').trim() || '#324352';
+    ctx.lineWidth=1;
+    ctx.stroke();
+  });
+}
+const gridColor = '#1c262d', gridStrong='#334450', inkFaint='#54666c';
+function drawGrid(){
+  ctx.font = "9px 'IBM Plex Mono', monospace";
+  GRID_LINES.forEach(g=>{
+    const y = project(0,g.lat).y;
+    ctx.strokeStyle = g.lat===0 ? gridStrong : gridColor;
+    ctx.lineWidth = g.lat===0 ? 1 : 1;
+    ctx.setLineDash(g.lat===0 ? [] : [2,4]);
+    ctx.beginPath();
+    ctx.moveTo(mapLeft, y);
+    ctx.lineTo(mapLeft+mapW, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = inkFaint;
+    if(mapW>500) ctx.fillText(g.label, mapLeft+6, y-4);
+  });
+}
+
+function wrapLon(lon){
+  return ((lon+180)%360+360)%360-180;
+}
+
+function drawFlywayPath(sp, opts){
+  const {bright} = opts;
+  ctx.save();
+  ctx.strokeStyle = sp.color;
+  ctx.globalAlpha = bright ? 0.85 : 0.22;
+  ctx.lineWidth = bright ? 1.6 : 1;
+  ctx.setLineDash(bright ? [] : [1,4]);
+  ctx.shadowColor = sp.color;
+  ctx.shadowBlur = bright ? 8 : 0;
+  let started=false, prevX=null;
+  ctx.beginPath();
+  sp.path.forEach(pt=>{
+    const lon = wrapLon(pt.lon);
+    const p = project(lon, pt.lat);
+    if(prevX!==null && Math.abs(p.x-prevX)>mapW*0.5){ started=false; }
+    if(!started){ ctx.moveTo(p.x,p.y); started=true; } else { ctx.lineTo(p.x,p.y); }
+    prevX=p.x;
+  });
+  ctx.stroke();
+  ctx.restore();
+}
+
+function pointOnPath(sp, pos){
+  const N = sp.path.length-1;
+  const idx = Math.max(0, Math.min(N, pos*N));
+  const i0 = Math.floor(idx), i1=Math.min(N,i0+1), t=idx-i0;
+  const a=sp.path[i0], b=sp.path[i1];
+  const lon = a.lon+(b.lon-a.lon)*t;
+  const lat = a.lat+(b.lat-a.lat)*t;
+  return project(wrapLon(lon), lat);
+}
+
+function drawBlob(x,y,r,color,alpha){
+  const grad = ctx.createRadialGradient(x,y,0,x,y,r);
+  grad.addColorStop(0, color);
+  grad.addColorStop(0.4, color);
+  grad.addColorStop(1, 'transparent');
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+let radarAngle = 0;
+function drawRadarSweep(){
+  if(!ctx.createConicGradient) return;
+  const cx = mapLeft+mapW/2, cy=mapTop+mapH/2;
+  try{
+    const grad = ctx.createConicGradient(radarAngle, cx, cy);
+    grad.addColorStop(0, 'rgba(79,199,179,0.10)');
+    grad.addColorStop(0.06, 'rgba(79,199,179,0.0)');
+    grad.addColorStop(1, 'rgba(79,199,179,0.0)');
+    ctx.save();
+    ctx.globalCompositeOperation='lighter';
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    ctx.rect(mapLeft,mapTop,mapW,mapH);
+    ctx.fill();
+    ctx.restore();
+  }catch(e){ /* unsupported: skip sweep */ }
+}
+
+/* ---------------------------------------------------------------
+   State
+--------------------------------------------------------------- */
+let selectedId = null; // null = all
+let month = 400/100; // slider units: 0..1199 -> 0..11.99
+let playing = false;
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const MONTH_NAMES=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function formatMonth(m){
+  const idx = Math.floor(m)%12;
+  const frac = m-Math.floor(m);
+  const part = frac<0.33 ? "Early" : frac<0.67 ? "Mid" : "Late";
+  return part+"-"+MONTH_NAMES[idx];
+}
+
+/* ---------------------------------------------------------------
+   DOM: species list
+--------------------------------------------------------------- */
+const listEl = document.getElementById('speciesList');
+function buildList(){
+  const allLi = document.createElement('li');
+  allLi.innerHTML = `<button class="species-row all${selectedId===null?' active':''}" data-id="">
+    <span class="swatch"></span>
+    <span class="names"><span class="common">All lineages</span><span class="latin">Full atlas view</span></span>
+  </button>`;
+  listEl.appendChild(allLi);
+  SPECIES.forEach(sp=>{
+    const li = document.createElement('li');
+    li.innerHTML = `<button class="species-row${selectedId===sp.id?' active':''}" data-id="${sp.id}" style="--sw:${sp.color}">
+      <span class="swatch"></span>
+      <span class="names"><span class="common">${sp.name}</span><span class="latin">${sp.latin}</span></span>
+    </button>`;
+    listEl.appendChild(li);
+  });
+  listEl.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      selectedId = btn.dataset.id || null;
+      refreshList();
+      renderInfo();
+    });
+  });
+}
+function refreshList(){
+  listEl.querySelectorAll('button').forEach(btn=>{
+    const id = btn.dataset.id || null;
+    btn.classList.toggle('active', id===selectedId);
+  });
+}
+buildList();
+
+/* ---------------------------------------------------------------
+   Info panel
+--------------------------------------------------------------- */
+const infoEl = document.getElementById('info');
+function renderInfo(){
+  if(!selectedId){
+    const activeCount = SPECIES.filter(sp=>{
+      const p = posAt(sp, month);
+      return p>0.03 && p<0.97;
+    }).length;
+    infoEl.innerHTML = `
+      <p class="default-copy">Six species, six strategies &mdash; from a flightless-adjacent shorebird's nonstop ocean crossing to a 3-gram hummingbird's dash over the Gulf. Select a lineage to trace its route.</p>
+      <p class="overview-stat">${activeCount} of 6 lineages currently in transit</p>`;
+    return;
+  }
+  const sp = SPECIES.find(s=>s.id===selectedId);
+  const pos = posAt(sp, month);
+  const posNext = posAt(sp, month+0.03);
+  const moving = Math.abs(posNext-pos)>0.0008;
+  let status;
+  if(!moving && pos<0.5) status = `On the breeding ground`;
+  else if(!moving && pos>=0.5) status = `On the wintering ground`;
+  else {
+    const southbound = posNext>pos;
+    const pct = Math.round((southbound?pos:1-pos)*100);
+    status = `In transit &mdash; ${southbound? 'southbound':'northbound'}, ${pct}% along the route`;
+  }
+  infoEl.innerHTML = `
+    <p class="status-line" style="--accent-dot:${sp.color}">${status}</p>
+    <h3>${sp.name}</h3>
+    <p class="latin-full">${sp.latin}</p>
+    <p class="note">${sp.note}</p>
+    <div class="stat-box"><span>In the field</span>${sp.distance} &mdash; ${sp.distanceNote}</div>
+    <div class="route">
+      <b>Breeding</b> &middot; ${sp.breeding.name}<br>
+      <b>Wintering</b> &middot; ${sp.wintering.name}
+    </div>`;
+}
+renderInfo();
+
+/* ---------------------------------------------------------------
+   Markers (breeding / wintering pins) for selected species
+--------------------------------------------------------------- */
+function renderMarkers(){
+  markersLayer.innerHTML='';
+  if(!selectedId) return;
+  const sp = SPECIES.find(s=>s.id===selectedId);
+  [ {pt:sp.breeding, label:'Breeding'}, {pt:sp.wintering, label:'Wintering'} ].forEach(entry=>{
+    const p = project(entry.pt.lon, entry.pt.lat);
+    const el = document.createElement('div');
+    el.className='pin';
+    el.style.left=p.x+'px'; el.style.top=p.y+'px';
+    el.style.setProperty('--pin-color', sp.color);
+    el.innerHTML = `<span class="tag">${entry.label} &middot; ${entry.pt.name}</span><span class="dot"></span><span class="stem"></span>`;
+    markersLayer.appendChild(el);
+  });
+}
+
+/* ---------------------------------------------------------------
+   Render loop
+--------------------------------------------------------------- */
+let lastT = performance.now();
+function frame(t){
+  const dt = Math.min(0.05,(t-lastT)/1000); lastT=t;
+  if(playing){
+    month += dt*0.9;
+    if(month>=12) month-=12;
+    syncSlider();
+    renderInfo();
+  }
+  radarAngle += dt*0.15;
+
+  ctx.clearRect(0,0,W,H);
+  drawGrid();
+  drawContinents();
+  drawRadarSweep();
+
+  SPECIES.forEach(sp=>{
+    const bright = selectedId===sp.id;
+    if(selectedId && !bright) return; // hide others when one is focused, keep it legible
+    drawFlywayPath(sp, {bright: bright || !selectedId});
+  });
+
+  SPECIES.forEach(sp=>{
+    const bright = selectedId===sp.id || !selectedId;
+    if(selectedId && !bright) return;
+    const pos = posAt(sp, month);
+    const posNext = posAt(sp, month+0.03);
+    const moving = Math.abs(posNext-pos)>0.0008;
+    const p = pointOnPath(sp, pos);
+    const r = bright && selectedId ? 22 : 10;
+    drawBlob(p.x, p.y, r, sp.color, bright && selectedId ? 0.9 : (moving?0.55:0.35));
+    if(!moving){
+      drawBlob(p.x,p.y, (bright&&selectedId?34:16), sp.color, 0.12);
+    }
+  });
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------------------------------------------------------------
+   Timeline controls
+--------------------------------------------------------------- */
+const slider = document.getElementById('monthSlider');
+const sliderFill = document.getElementById('sliderFill');
+const dateReadout = document.getElementById('dateReadout');
+function syncSlider(){
+  slider.value = Math.round(month*100);
+  sliderFill.style.width = (month/12*100)+'%';
+  dateReadout.innerHTML = '<span class="yr">MODELLED YEAR</span>'+formatMonth(month);
+}
+slider.addEventListener('input', ()=>{
+  month = (+slider.value)/100;
+  playing=false; updatePlayIcon();
+  sliderFill.style.width=(month/12*100)+'%';
+  dateReadout.innerHTML='<span class="yr">MODELLED YEAR</span>'+formatMonth(month);
+  renderInfo();
+});
+syncSlider();
+
+const playBtn = document.getElementById('playBtn');
+function updatePlayIcon(){
+  playBtn.innerHTML = playing
+    ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
+    : '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"></polygon></svg>';
+  playBtn.setAttribute('aria-label', playing? 'Pause year':'Play year');
+}
+playBtn.addEventListener('click', ()=>{
+  playing=!playing && !reduced;
+  updatePlayIcon();
+});
+
+/* Re-render markers when selection or layout changes */
+const origRenderInfo = renderInfo;
+renderInfo = function(){ origRenderInfo(); renderMarkers(); };
+renderInfo();
+
+window.addEventListener('resize', ()=>{ renderMarkers(); });
+
+})();
+</script>
+<noscript>
+  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:40px;
+              background:#080b10;color:#93a8ae;font:16px/1.6 Georgia,serif;text-align:center;z-index:9999;">
+    Flyway Atlas is an interactive visualisation and needs JavaScript enabled to draw itself.
+  </div>
+</noscript>
+</body>
+</html>

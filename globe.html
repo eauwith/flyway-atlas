@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chasing the Sun &middot; Following Summer</title>
+<meta name="description" content="A WebGL globe tracing six bird migrations as true great circles, with a day/night terminator that shifts through the year.">
+<meta name="theme-color" content="#080b10">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Following Summer">
+<meta property="og:title" content="Chasing the Sun">
+<meta property="og:description" content="A WebGL globe tracing six bird migrations as true great circles, with a day/night terminator that shifts through the year.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Chasing the Sun">
+<meta name="twitter:description" content="A WebGL globe tracing six bird migrations as true great circles, with a day/night terminator that shifts through the year.">
+<link rel="canonical" href="https://ellewitherow.github.io/flyway-atlas/globe.html">
+<meta property="og:url" content="https://ellewitherow.github.io/flyway-atlas/globe.html">
+<!-- Add 1200x630 screenshots at assets/og-*.png, then uncomment:
+<meta property="og:image" content="https://ellewitherow.github.io/flyway-atlas/assets/og-globe.png">
+<meta name="twitter:image" content="https://ellewitherow.github.io/flyway-atlas/assets/og-globe.png">
+-->
+
+<style>
+  img{ max-width:100%; }
+  [hidden]{ display:none !important; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#080b10;
+    --bg-2:#0d131a;
+    --panel:#10161ded;
+    --panel-border:#26343d;
+    --ink:#eef4f1;
+    --ink-dim:#93a8ae;
+    --ink-faint:#54666c;
+    --gold:#cfa15f;
+    --accent:#4fc7b3;
+    --accent-dim:#2c5a52;
+    --serif-display:'Fraunces','Iowan Old Style','Palatino Linotype',serif;
+    --serif-body:'Newsreader','Iowan Old Style',Georgia,serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--serif-body);
+    overflow:hidden; height:100dvh; width:100%;
+  }
+  .stage{
+    position:relative; width:100%; height:100dvh; overflow:hidden;
+    background:
+      radial-gradient(ellipse 55% 45% at 40% 48%, rgba(47,158,143,0.07), transparent 70%),
+      linear-gradient(180deg,#0a0f16 0%, var(--bg) 55%, #05070a 100%);
+    cursor:grab;
+    touch-action:none;
+  }
+  .stage.dragging{ cursor:grabbing; }
+  canvas#gl{ position:absolute; top:0; left:0; width:100%; height:100%; display:block; }
+  .pins{ position:absolute; inset:0; pointer-events:none; }
+  .pin{
+    position:absolute; transform:translate(-50%,-100%);
+    display:flex; flex-direction:column; align-items:center;
+    transition:opacity .25s ease;
+  }
+  .pin .tag{
+    font-family:var(--mono); font-size:10px; letter-spacing:.04em; white-space:nowrap;
+    color:var(--ink); background:rgba(8,11,16,0.78); padding:3px 8px; border-radius:4px;
+    border:1px solid rgba(255,255,255,0.1);
+  }
+  .pin .tag b{ color:var(--pin-color); font-weight:500; }
+  .pin .stem{ width:1px; height:18px; background:linear-gradient(var(--pin-color), transparent); }
+
+  /* Masthead */
+  .masthead{ position:absolute; top:0; left:0; padding:26px 24px 0 30px; max-width:430px; pointer-events:none; }
+  .eyebrow{ font-family:var(--mono); font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin:0 0 9px; }
+  .masthead h1{ font-family:var(--serif-display); font-weight:500; font-size:clamp(22px,3vw,31px); line-height:1.08; margin:0 0 8px; text-wrap:balance; }
+  .masthead h1 em{ font-style:italic; font-weight:300; color:var(--gold); }
+  .masthead p{ font-size:13px; line-height:1.52; color:var(--ink-dim); margin:0; max-width:39ch; }
+
+  /* Sidebar */
+  .sidebar{
+    position:absolute; top:0; right:0; width:328px; height:100%;
+    background:var(--panel); border-left:1px solid var(--panel-border);
+    backdrop-filter:blur(8px);
+    display:flex; flex-direction:column; padding:26px 0 0;
+  }
+  .sidebar h2{ font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 10px; padding:0 22px; }
+  .species-list{ list-style:none; margin:0; padding:0 10px; }
+  .species-row{
+    display:flex; align-items:center; gap:11px; width:100%;
+    background:none; border:0; text-align:left; cursor:pointer;
+    padding:8px 12px; border-radius:8px; color:var(--ink); font-family:var(--serif-body);
+  }
+  .species-row:hover{ background:rgba(255,255,255,0.04); }
+  .species-row.active{ background:rgba(255,255,255,0.075); }
+  .species-row:focus-visible{ outline:1.5px solid var(--accent); outline-offset:-1px; }
+  .species-row .swatch{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:var(--sw); box-shadow:0 0 8px 1px var(--sw); }
+  .species-row.all .swatch{ background:none; border:1.5px solid var(--gold); box-shadow:none; }
+  .species-row .names{ display:flex; flex-direction:column; line-height:1.25; }
+  .species-row .common{ font-size:13.5px; }
+  .species-row .latin{ font-family:var(--mono); font-size:9.5px; color:var(--ink-faint); }
+
+  .info{ flex:1; overflow-y:auto; padding:16px 22px 22px; margin-top:12px; border-top:1px solid var(--panel-border); }
+  .info .status-line{ font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--tone,var(--accent)); margin:0 0 10px; }
+  .info h3{ font-family:var(--serif-display); font-weight:600; font-size:22px; margin:0 0 3px; text-wrap:balance; }
+  .info .latin-full{ font-style:italic; color:var(--gold); font-size:13.5px; margin:0 0 14px; }
+  .info p.note{ font-size:14px; line-height:1.58; color:var(--ink-dim); margin:0 0 16px; }
+  .readouts{ display:flex; flex-direction:column; gap:1px; background:var(--panel-border); border:1px solid var(--panel-border); border-radius:8px; overflow:hidden; margin-bottom:16px; }
+  .readout{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; background:#0e141b; padding:9px 12px; }
+  .readout .k{ font-family:var(--mono); font-size:9.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-faint); }
+  .readout .v{ font-family:var(--mono); font-size:12px; color:var(--ink); font-variant-numeric:tabular-nums; text-align:right; }
+  .readout .v.hl{ color:var(--tone,var(--accent)); }
+  .info .route{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); line-height:1.75; }
+  .info .route b{ color:var(--ink); font-weight:500; }
+  .info .default-copy{ font-size:14.5px; line-height:1.6; color:var(--ink-dim); font-style:italic; margin:0 0 16px; }
+
+  /* Legend */
+  .legend{
+    position:absolute; left:30px; bottom:98px;
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
+    padding:13px 15px 11px; backdrop-filter:blur(6px); max-width:236px;
+  }
+  .legend h2{ font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 10px; }
+  .legend-row{ display:flex; align-items:center; gap:9px; margin-bottom:7px; font-size:11.5px; color:var(--ink-dim); }
+  .legend-row:last-of-type{ margin-bottom:0; }
+  .key-arc{ width:18px; height:2px; border-radius:2px; background:linear-gradient(90deg,#ff6a4d,#e0a23c); flex:0 0 auto; }
+  .key-node{ width:9px; height:9px; border-radius:50%; background:#4fc7b3; box-shadow:0 0 9px 2px #4fc7b3; flex:0 0 auto; margin:0 4px; }
+  .key-night{ width:16px; height:16px; border-radius:50%; background:linear-gradient(100deg,#cfa15f 0%,#cfa15f 38%,#101820 40%); flex:0 0 auto; margin:0 1px; }
+  .legend-note{ margin:10px 0 0; font-size:10.5px; color:var(--ink-faint); font-style:italic; line-height:1.45; }
+
+  /* Timebar */
+  .timebar{
+    position:absolute; left:0; bottom:0; right:328px; height:82px;
+    background:var(--panel); border-top:1px solid var(--panel-border); backdrop-filter:blur(8px);
+    display:flex; align-items:center; gap:18px; padding:0 26px;
+  }
+  .play-btn{
+    width:38px; height:38px; border-radius:50%; flex:0 0 auto;
+    border:1px solid var(--panel-border); background:rgba(255,255,255,0.03);
+    color:var(--ink-dim); display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .play-btn:hover{ color:var(--accent); border-color:var(--accent-dim); }
+  .play-btn:focus-visible{ outline:1.5px solid var(--accent); outline-offset:2px; }
+  .track{ position:relative; flex:1; height:42px; }
+  .month-ticks{ position:absolute; top:2px; left:0; right:0; display:flex; justify-content:space-between; font-family:var(--mono); font-size:9.5px; color:var(--ink-faint); }
+  .month-ticks span{ width:16px; text-align:center; }
+  .rail{ position:absolute; top:26px; left:0; right:0; height:3px; background:#2a3742; border-radius:3px; }
+  .fill{ position:absolute; top:26px; left:0; height:3px; background:var(--accent); border-radius:3px; }
+  input[type=range]{
+    position:absolute; top:16px; left:0; width:100%; height:24px; margin:0;
+    -webkit-appearance:none; appearance:none; background:transparent; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
+    background:var(--ink); border:2px solid var(--accent); margin-top:-6px;
+    box-shadow:0 0 10px 2px rgba(79,199,179,0.45);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:15px; height:15px; border-radius:50%; background:var(--ink);
+    border:2px solid var(--accent); box-shadow:0 0 10px 2px rgba(79,199,179,0.45);
+  }
+  .readout-block{ flex:0 0 auto; text-align:right; min-width:126px; }
+  .readout-block .date{ font-family:var(--mono); font-size:13px; letter-spacing:.04em; color:var(--ink); }
+  .readout-block .sun{ font-family:var(--mono); font-size:9.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--gold); margin-top:3px; }
+
+  .hint{
+    position:absolute; left:30px; bottom:calc(98px + 158px);
+    font-family:var(--mono); font-size:10px; letter-spacing:.07em;
+    text-transform:uppercase; color:var(--ink-faint); pointer-events:none;
+  }
+  .fallback{
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    padding:40px; text-align:center; font-size:15px; color:var(--ink-dim); line-height:1.6;
+  }
+
+  @media (max-width: 860px){
+    .sidebar{ width:100%; height:auto; top:auto; bottom:82px; border-left:0; border-top:1px solid var(--panel-border); max-height:46vh; padding-top:14px; }
+    .sidebar h2{ padding:0 16px; }
+    .species-list{ display:flex; gap:6px; overflow-x:auto; padding:0 12px 4px; }
+    .species-row{ flex:0 0 auto; }
+    .species-row .latin{ display:none; }
+    .info{ padding:12px 16px 16px; margin-top:8px; }
+    .timebar{ right:0; height:74px; padding:0 14px; gap:12px; }
+    .masthead{ padding:16px 16px 0; max-width:72vw; }
+    .masthead h1{ font-size:18px; }
+    .masthead p{ display:none; }
+    .legend, .hint{ display:none; }
+    .readout-block{ min-width:96px; }
+    .month-ticks{ font-size:8.5px; letter-spacing:0; }
+    .month-ticks span{ width:auto; }
+    .readout-block .date{ font-size:11px; }
+  }
+
+  /* site navigation back to the series index */
+  .home-link{ color:inherit; text-decoration:none; border-bottom:1px solid currentColor; padding-bottom:1px; pointer-events:auto; }
+  .home-link:hover{ color:var(--ink); }
+  .home-link:focus-visible{ outline:1.5px solid var(--accent); outline-offset:3px; border-radius:2px; }
+  .masthead{ pointer-events:none; }
+  .masthead .eyebrow{ pointer-events:auto; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="gl"></canvas>
+  <div class="pins" id="pins"></div>
+  <div class="fallback" id="fallback">This globe needs WebGL, which this browser has turned off. The flat-map version of the atlas works without it.</div>
+</div>
+
+<div class="masthead">
+  <p class="eyebrow"><a class="home-link" href="index.html">Following Summer</a> &middot; Vol. III</p>
+  <h1>Chasing the <em>Sun</em></h1>
+  <p>Six migrations drawn as true great circles on a turning earth. The lit half is where the sun is now: scrub the year and watch daylight pool at one pole, then the other &mdash; which is the thing the birds are actually following.</p>
+</div>
+
+<p class="hint">Drag to spin &middot; Scroll to zoom</p>
+
+<div class="legend">
+  <h2>Reading the globe</h2>
+  <div class="legend-row"><span class="key-arc"></span> Flight path, breeding to wintering</div>
+  <div class="legend-row"><span class="key-node"></span> Where that population is today</div>
+  <div class="legend-row"><span class="key-night"></span> Day and night, at this date</div>
+  <p class="legend-note">Routes modelled from published tracking studies &mdash; not a live radar feed.</p>
+</div>
+
+<aside class="sidebar">
+  <h2>Lineages</h2>
+  <ul class="species-list" id="speciesList"></ul>
+  <div class="info" id="info"></div>
+</aside>
+
+<div class="timebar">
+  <button class="play-btn" id="playBtn" aria-label="Play the year">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"></polygon></svg>
+  </button>
+  <div class="track">
+    <div class="month-ticks">
+      <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
+      <span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
+    </div>
+    <div class="rail"></div>
+    <div class="fill" id="fill"></div>
+    <input type="range" id="monthSlider" min="0" max="1199" value="350" step="1" aria-label="Month of year">
+  </div>
+  <div class="readout-block">
+    <div class="date" id="dateOut">Mid-April</div>
+    <div class="sun" id="sunOut">Sun overhead 9.7&deg;N</div>
+  </div>
+</div>
+
+<script src="assets/vendor/three.min.js"></script>
+<script src="assets/vendor/gsap.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+const DEG = Math.PI/180;
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ==========================================================
+   1. Data
+   ========================================================== */
+const CONTINENTS = [
+ { pts:[[-168,66],[-155,71],[-125,74],[-95,73],[-80,67],[-85,58],[-95,50],[-80,45],[-65,47],[-53,47],
+        [-60,42],[-75,35],[-81,25],[-88,21],[-97,19],[-105,21],[-112,29],[-117,33],[-122,38],[-124,47],
+        [-130,54],[-145,60],[-160,60]] },
+ { pts:[[-45,83],[-25,82],[-18,77],[-22,71],[-35,67],[-48,67],[-54,73],[-52,79]] },
+ { pts:[[-77,9],[-72,5],[-60,5],[-50,1],[-35,-5],[-35,-15],[-40,-23],[-48,-25],[-58,-34],[-68,-40],
+        [-73,-45],[-72,-53],[-68,-55],[-65,-48],[-70,-30],[-70,-18],[-75,-5],[-80,2]] },
+ { pts:[[-9,36],[-10,44],[0,50],[5,60],[15,68],[35,70],[55,68],[70,73],[95,75],[125,73],[148,66],
+        [160,58],[170,52],[160,45],[145,40],[132,35],[122,31],[110,20],[100,10],[95,15],[80,8],[77,10],
+        [70,20],[60,25],[50,25],[45,15],[35,15],[33,32],[27,37],[19,40],[9,38],[0,38]] },
+ { pts:[[-17,21],[-10,30],[0,35],[10,37],[20,32],[32,31],[35,20],[43,12],[51,12],[48,2],[42,-5],
+        [40,-15],[35,-25],[30,-30],[20,-34],[15,-27],[12,-18],[10,-6],[8,4],[0,5],[-8,5],[-16,12]] },
+ { pts:[[113,-22],[122,-18],[130,-12],[137,-12],[142,-11],[148,-20],[153,-28],[150,-37],[143,-39],
+        [137,-35],[132,-32],[122,-34],[114,-30],[113,-26]] },
+ { pts:[[172,-41],[174,-38],[176,-38],[178,-40],[176,-42],[173,-45],[171,-43]] },
+ { pts:[[-60,-8],[-50,-5],[-45,-8],[-52,-12],[-58,-12]] },
+];
+
+const SPECIES = [
+ { id:"tern", name:"Arctic Tern", latin:"Sterna paradisaea", color:"#ff6a4d",
+   breeding:{lon:-20,lat:74,name:"Greenland & the High Arctic"},
+   wintering:{lon:-15,lat:-68,name:"Antarctic pack ice"},
+   nb:[3.0,4.7], sb:[7.5,9.6], distance:"~90,000 km / year",
+   note:"It keeps two summers a year and almost no winter at all, flying the length of the Atlantic to reach whichever pole is currently in daylight." },
+ { id:"godwit", name:"Bar-tailed Godwit", latin:"Limosa lapponica baueri", color:"#e0a23c",
+   breeding:{lon:-155,lat:64,name:"Western Alaska"},
+   wintering:{lon:174,lat:-38,name:"North Island, New Zealand"},
+   nb:[2.7,4.3], sb:[8.7,9.4], distance:"11,000 km nonstop",
+   note:"Crosses the entire Pacific in one 8-10 day flight without landing, feeding or drinking, halving its own body weight on the way." },
+ { id:"hummingbird", name:"Ruby-throated Hummingbird", latin:"Archilochus colubris", color:"#d97fb0",
+   breeding:{lon:-78,lat:42,name:"Eastern North America"},
+   wintering:{lon:-84,lat:10,name:"Costa Rica & Central America"},
+   nb:[2.6,4.2], sb:[8.3,9.8], distance:"~800 km over open water",
+   note:"Crosses the Gulf of Mexico in a single twenty-hour flight, at a body weight of roughly three grams." },
+ { id:"swallow", name:"Barn Swallow", latin:"Hirundo rustica", color:"#35a7c9",
+   breeding:{lon:12,lat:50,name:"Europe"},
+   wintering:{lon:26,lat:-26,name:"Southern Africa"},
+   nb:[3.2,4.8], sb:[8.2,9.7], distance:"~10,000 km one way",
+   note:"Travels by day and low to the ground, tracing coastlines and river valleys south across the Sahara." },
+ { id:"osprey", name:"Osprey", latin:"Pandion haliaetus", color:"#2f9e8f",
+   breeding:{lon:16,lat:61,name:"Scandinavia"},
+   wintering:{lon:-2,lat:6,name:"West Africa"},
+   nb:[2.8,4.1], sb:[7.6,9.1], distance:"~7,000 km one way",
+   note:"Young ospreys migrate alone, without a parent to follow, navigating the first journey on inherited instinct." },
+ { id:"goose", name:"Snow Goose", latin:"Anser caerulescens", color:"#7c8fe0",
+   breeding:{lon:-95,lat:71,name:"Canadian Arctic"},
+   wintering:{lon:-94,lat:29,name:"Gulf Coast, USA"},
+   nb:[2.0,4.0], sb:[8.6,10.3], distance:"~4,500 km one way",
+   note:"Moves in flocks tens of thousands strong, timed so that arrival on the tundra meets the first thaw." },
+];
+
+SPECIES.forEach(sp=>{
+  sp.keyframes=[{m:0,pos:1},{m:sp.nb[0],pos:1},{m:sp.nb[1],pos:0},{m:sp.sb[0],pos:0},{m:sp.sb[1],pos:1},{m:12,pos:1}];
+});
+
+function posAt(sp, month){
+  const kf=sp.keyframes, m=((month%12)+12)%12;
+  for(let i=0;i<kf.length-1;i++){
+    if(m>=kf[i].m && m<=kf[i+1].m){
+      const span=kf[i+1].m-kf[i].m||1;
+      return kf[i].pos+(kf[i+1].pos-kf[i].pos)*((m-kf[i].m)/span);
+    }
+  }
+  return kf[kf.length-1].pos;
+}
+
+/* ==========================================================
+   2. Earth texture, painted from the continent outlines
+   ========================================================== */
+function smoothClosed(g, pts){
+  const n=pts.length;
+  g.beginPath();
+  g.moveTo((pts[0].x+pts[1].x)/2,(pts[0].y+pts[1].y)/2);
+  for(let i=0;i<n;i++){
+    const p0=pts[(i-1+n)%n], p1=pts[i], p2=pts[(i+1)%n], p3=pts[(i+2)%n];
+    g.bezierCurveTo(p1.x+(p2.x-p0.x)/6, p1.y+(p2.y-p0.y)/6,
+                    p2.x-(p3.x-p1.x)/6, p2.y-(p3.y-p1.y)/6, p2.x, p2.y);
+  }
+  g.closePath();
+}
+
+function buildEarthTexture(){
+  const TW=2048, TH=1024;
+  const cv=document.createElement('canvas'); cv.width=TW; cv.height=TH;
+  const g=cv.getContext('2d');
+  const px=(lon,lat)=>({x:(lon+180)/360*TW, y:(90-lat)/180*TH});
+
+  const ocean=g.createLinearGradient(0,0,0,TH);
+  ocean.addColorStop(0,'#0c1922'); ocean.addColorStop(0.5,'#0a1620'); ocean.addColorStop(1,'#0c1922');
+  g.fillStyle=ocean; g.fillRect(0,0,TW,TH);
+
+  // polar ice
+  g.fillStyle='#16222b';
+  g.fillRect(0,0,TW,px(0,72).y);
+  g.fillRect(0,px(0,-66).y,TW,TH-px(0,-66).y);
+  g.fillStyle='#1d2a33';
+  g.beginPath();
+  g.moveTo(0,TH);
+  for(let lon=-180;lon<=180;lon+=12){
+    const wob=Math.sin(lon*0.07)*10+Math.cos(lon*0.031)*7;
+    const p=px(lon,-70+wob*0.35);
+    g.lineTo(p.x,p.y);
+  }
+  g.lineTo(TW,TH); g.closePath(); g.fill();
+
+  // graticule
+  g.strokeStyle='rgba(120,160,175,0.10)'; g.lineWidth=1.5;
+  for(let lon=-180;lon<=180;lon+=30){
+    g.beginPath(); g.moveTo(px(lon,90).x,0); g.lineTo(px(lon,90).x,TH); g.stroke();
+  }
+  [60,30,-30,-60].forEach(lat=>{
+    g.beginPath(); g.moveTo(0,px(0,lat).y); g.lineTo(TW,px(0,lat).y); g.stroke();
+  });
+  g.setLineDash([9,11]); g.strokeStyle='rgba(207,161,95,0.22)';
+  [23.44,-23.44,66.56,-66.56].forEach(lat=>{
+    g.beginPath(); g.moveTo(0,px(0,lat).y); g.lineTo(TW,px(0,lat).y); g.stroke();
+  });
+  g.setLineDash([]);
+  g.strokeStyle='rgba(120,160,175,0.28)'; g.lineWidth=2;
+  g.beginPath(); g.moveTo(0,px(0,0).y); g.lineTo(TW,px(0,0).y); g.stroke();
+
+  // land
+  CONTINENTS.forEach(c=>{
+    smoothClosed(g, c.pts.map(([lon,lat])=>px(lon,lat)));
+    g.fillStyle='#20303c'; g.fill();
+    g.strokeStyle='#3a5162'; g.lineWidth=2.5; g.stroke();
+  });
+
+  return cv;
+}
+
+/* ==========================================================
+   3. Scene
+   ========================================================== */
+const stage=document.getElementById('stage');
+const glCanvas=document.getElementById('gl');
+const pinsLayer=document.getElementById('pins');
+
+let renderer, scene, camera, earthGroup, earthMat, atmoMat;
+try{
+  renderer=new THREE.WebGLRenderer({canvas:glCanvas, antialias:true, alpha:true});
+}catch(err){
+  document.getElementById('fallback').style.display='flex';
+}
+
+function lonLatToVec3(lon,lat,r){
+  const phi=(90-lat)*DEG, theta=(lon+180)*DEG;
+  return new THREE.Vector3(
+    -r*Math.cos(theta)*Math.sin(phi),
+     r*Math.cos(phi),
+     r*Math.sin(theta)*Math.sin(phi)
+  );
+}
+
+const FOV=36;
+// Distance at which the globe fills the *visible* part of the frustum. Derived
+// from the viewport in resize(), because a narrow portrait phone needs the
+// camera much further back than a wide desktop window for the same framing.
+let frameBase=5.7;
+const state={ month:3.5, spin:0, polar:80*DEG, radius:5.7, autoSpin:true, sunLat:0 };
+let selected=null;
+let lastInfoStamp='';
+
+if(renderer){
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(FOV,1,0.1,200);
+  earthGroup=new THREE.Group();
+  scene.add(earthGroup);
+
+  const tex=new THREE.CanvasTexture(buildEarthTexture());
+  tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+
+  earthMat=new THREE.ShaderMaterial({
+    uniforms:{ uMap:{value:tex}, uSun:{value:new THREE.Vector3(0.55,0,0.83).normalize()} },
+    vertexShader:`
+      varying vec2 vUv; varying vec3 vNW;
+      void main(){
+        vUv=uv;
+        vNW=normalize(mat3(modelMatrix)*normal);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+      }`,
+    fragmentShader:`
+      uniform sampler2D uMap; uniform vec3 uSun;
+      varying vec2 vUv; varying vec3 vNW;
+      void main(){
+        vec3 base=texture2D(uMap,vUv).rgb;
+        float l=dot(normalize(vNW), normalize(uSun));
+        float day=smoothstep(-0.10,0.20,l);
+        vec3 night=base*0.34+vec3(0.010,0.026,0.040);
+        vec3 col=mix(night, base*(0.80+0.55*day), day);
+        float term=exp(-pow(l/0.17,2.0));
+        col+=vec3(0.40,0.22,0.09)*term*0.30;
+        gl_FragColor=vec4(col,1.0);
+      }`
+  });
+  earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(1,96,64), earthMat));
+
+  atmoMat=new THREE.ShaderMaterial({
+    uniforms:{ uSun:{value:earthMat.uniforms.uSun.value}, uColor:{value:new THREE.Color('#63d8ff')} },
+    vertexShader:`
+      varying vec3 vNW; varying vec3 vPW;
+      void main(){
+        vNW=normalize(mat3(modelMatrix)*normal);
+        vec4 wp=modelMatrix*vec4(position,1.0);
+        vPW=wp.xyz;
+        gl_Position=projectionMatrix*viewMatrix*wp;
+      }`,
+    fragmentShader:`
+      uniform vec3 uColor; uniform vec3 uSun;
+      varying vec3 vNW; varying vec3 vPW;
+      void main(){
+        vec3 v=normalize(cameraPosition-vPW);
+        float fres=pow(clamp(1.0-abs(dot(normalize(vNW),v)),0.0,1.0),2.4);
+        float sun=smoothstep(-0.55,0.5,dot(normalize(vNW),normalize(uSun)));
+        gl_FragColor=vec4(uColor*fres*(0.20+0.95*sun), fres*(0.30+0.60*sun));
+      }`,
+    side:THREE.BackSide, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false
+  });
+  earthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(1.035,64,48), atmoMat));
+
+  // stars
+  const starPos=[];
+  for(let i=0;i<900;i++){
+    const u=Math.random()*2-1, t=Math.random()*Math.PI*2, s=Math.sqrt(1-u*u), r=26+Math.random()*30;
+    starPos.push(s*Math.cos(t)*r, u*r, s*Math.sin(t)*r);
+  }
+  const starGeo=new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos,3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
+    size:0.14, color:0x9fb8c0, transparent:true, opacity:0.75, sizeAttenuation:true, depthWrite:false
+  })));
+}
+
+/* glow sprite texture */
+function glowTexture(){
+  const s=128, cv=document.createElement('canvas'); cv.width=cv.height=s;
+  const g=cv.getContext('2d');
+  const grd=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+  grd.addColorStop(0,'rgba(255,255,255,1)');
+  grd.addColorStop(0.25,'rgba(255,255,255,0.55)');
+  grd.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=grd; g.fillRect(0,0,s,s);
+  return new THREE.CanvasTexture(cv);
+}
+
+/* ==========================================================
+   4. Great-circle flight paths
+   ========================================================== */
+function slerp(a,b,t){
+  const d=Math.min(1,Math.max(-1,a.dot(b))), om=Math.acos(d), so=Math.sin(om);
+  if(so<1e-6) return a.clone();
+  return a.clone().multiplyScalar(Math.sin((1-t)*om)/so)
+    .add(b.clone().multiplyScalar(Math.sin(t*om)/so));
+}
+
+if(renderer){
+  const glowTex=glowTexture();
+  SPECIES.forEach(sp=>{
+    const a=lonLatToVec3(sp.breeding.lon, sp.breeding.lat, 1);
+    const b=lonLatToVec3(sp.wintering.lon, sp.wintering.lat, 1);
+    sp.centralAngle=Math.acos(Math.min(1,Math.max(-1,a.clone().normalize().dot(b.clone().normalize()))));
+    const lift=0.045+0.10*(sp.centralAngle/Math.PI);
+    const pts=[];
+    for(let i=0;i<=96;i++){
+      const t=i/96;
+      const p=slerp(a,b,t);
+      p.multiplyScalar(1+lift*Math.sin(Math.PI*t));
+      pts.push(p);
+    }
+    sp.curve=new THREE.CatmullRomCurve3(pts);
+    const geo=new THREE.TubeGeometry(sp.curve,180,0.0075,8,false);
+    sp.tubeMat=new THREE.MeshBasicMaterial({
+      color:new THREE.Color(sp.color), transparent:true, opacity:0.72,
+      blending:THREE.AdditiveBlending, depthWrite:false
+    });
+    sp.tube=new THREE.Mesh(geo, sp.tubeMat);
+    sp.indexCount=geo.index.count;
+    // reveal defaults to fully drawn: the entrance tween animates *down* from this,
+    // so if the ticker never runs the routes are still on screen.
+    sp.reveal=1;
+    geo.setDrawRange(0, sp.indexCount);
+    earthGroup.add(sp.tube);
+
+    sp.flock=new THREE.Sprite(new THREE.SpriteMaterial({
+      map:glowTex, color:new THREE.Color(sp.color), transparent:true,
+      blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.95
+    }));
+    sp.flock.scale.setScalar(0.14);
+    earthGroup.add(sp.flock);
+
+    sp.halo=new THREE.Sprite(new THREE.SpriteMaterial({
+      map:glowTex, color:new THREE.Color(sp.color), transparent:true,
+      blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.22
+    }));
+    sp.halo.scale.setScalar(0.30);
+    earthGroup.add(sp.halo);
+
+    sp.pulse={ s:1 };
+  });
+}
+
+/* ==========================================================
+   5. Sun position & daylight
+   ========================================================== */
+function solarDeclination(month){
+  const doy=(month/12)*365.25;
+  return -23.44*DEG*Math.cos(2*Math.PI*(doy+10)/365.25);
+}
+function dayLengthHours(latDeg, declRad){
+  const lat=latDeg*DEG;
+  const c=-Math.tan(lat)*Math.tan(declRad);
+  if(c<=-1) return 24;
+  if(c>=1) return 0;
+  return 24*Math.acos(c)/Math.PI;
+}
+function formatHours(h){
+  if(h>=23.98) return "24 h &middot; midnight sun";
+  if(h<=0.02) return "0 h &middot; polar night";
+  const hh=Math.floor(h), mm=Math.round((h-hh)*60);
+  return hh+" h "+(mm<10?"0":"")+mm+" m";
+}
+
+/* ==========================================================
+   6. UI
+   ========================================================== */
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function formatMonth(m){
+  const i=Math.floor(((m%12)+12)%12), f=m-Math.floor(m);
+  return (f<0.33?"Early":f<0.67?"Mid":"Late")+"-"+MONTHS[i];
+}
+
+const listEl=document.getElementById('speciesList');
+const infoEl=document.getElementById('info');
+
+function buildList(){
+  const all=document.createElement('li');
+  all.innerHTML='<button class="species-row all active" data-id=""><span class="swatch"></span>'+
+    '<span class="names"><span class="common">All lineages</span><span class="latin">Whole-globe view</span></span></button>';
+  listEl.appendChild(all);
+  SPECIES.forEach(sp=>{
+    const li=document.createElement('li');
+    li.innerHTML='<button class="species-row" data-id="'+sp.id+'" style="--sw:'+sp.color+'">'+
+      '<span class="swatch"></span><span class="names"><span class="common">'+sp.name+
+      '</span><span class="latin">'+sp.latin+'</span></span></button>';
+    listEl.appendChild(li);
+  });
+  listEl.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click',()=>select(btn.dataset.id||null));
+  });
+}
+buildList();
+
+function select(id){
+  selected = id ? SPECIES.find(s=>s.id===id) : null;
+  listEl.querySelectorAll('button').forEach(b=>b.classList.toggle('active',(b.dataset.id||null)===id));
+  renderInfo();
+  if(renderer) flyTo(selected);
+}
+
+function statusOf(sp){
+  const pos=posAt(sp,state.month), next=posAt(sp,state.month+0.03);
+  const moving=Math.abs(next-pos)>0.0008;
+  if(!moving) return { text: pos<0.5 ? "On the breeding ground" : "On the wintering ground", pos, moving };
+  const south=next>pos;
+  const pct=Math.round((south?pos:1-pos)*100);
+  return { text:"In transit &middot; "+(south?"southbound":"northbound")+" &middot; "+pct+"%", pos, moving };
+}
+
+function renderInfo(){
+  const decl=solarDeclination(state.month);
+  if(!selected){
+    const moving=SPECIES.filter(sp=>{ const p=posAt(sp,state.month); return p>0.03&&p<0.97; }).length;
+    infoEl.innerHTML=
+      '<p class="default-copy">Six species, six answers to the same problem: how to stay inside the summer. Pick a lineage and the globe turns to frame its route.</p>'+
+      '<div class="readouts">'+
+        '<div class="readout"><span class="k">Lineages in transit</span><span class="v hl">'+moving+' of 6</span></div>'+
+        '<div class="readout"><span class="k">Sun overhead</span><span class="v">'+Math.abs(decl/DEG).toFixed(1)+'&deg;'+(decl>=0?'N':'S')+'</span></div>'+
+        '<div class="readout"><span class="k">Daylight at 70&deg;N</span><span class="v">'+formatHours(dayLengthHours(70,decl))+'</span></div>'+
+      '</div>';
+    return;
+  }
+  const st=statusOf(selected);
+  const lat=currentLat(selected, st.pos);
+  infoEl.innerHTML=
+    '<p class="status-line" style="--tone:'+selected.color+'">'+st.text+'</p>'+
+    '<h3>'+selected.name+'</h3>'+
+    '<p class="latin-full">'+selected.latin+'</p>'+
+    '<p class="note">'+selected.note+'</p>'+
+    '<div class="readouts">'+
+      '<div class="readout"><span class="k">Route</span><span class="v">'+selected.distance+'</span></div>'+
+      '<div class="readout"><span class="k">Latitude now</span><span class="v">'+Math.abs(lat).toFixed(1)+'&deg;'+(lat>=0?'N':'S')+'</span></div>'+
+      '<div class="readout"><span class="k">Daylight there</span><span class="v hl" style="--tone:'+selected.color+'">'+formatHours(dayLengthHours(lat,decl))+'</span></div>'+
+    '</div>'+
+    '<div class="route"><b>Breeding</b> &middot; '+selected.breeding.name+'<br><b>Wintering</b> &middot; '+selected.wintering.name+'</div>';
+}
+
+function currentLat(sp,pos){
+  if(!sp.curve) return sp.breeding.lat+(sp.wintering.lat-sp.breeding.lat)*pos;
+  const p=sp.curve.getPointAt(Math.min(1,Math.max(0,pos)));
+  return Math.asin(p.y/p.length())/DEG;
+}
+
+/* ==========================================================
+   7. Camera flights (GSAP)
+   ========================================================== */
+function shortest(from,to){
+  let d=(to-from)%(Math.PI*2);
+  if(d>Math.PI) d-=Math.PI*2;
+  if(d<-Math.PI) d+=Math.PI*2;
+  return from+d;
+}
+
+function flyTo(sp){
+  gsap.killTweensOf(state,"spin,polar,radius");
+  if(!sp){
+    state.autoSpin=true;
+    gsap.to(state,{ polar:80*DEG, radius:frameBase, duration:1.3, ease:'power2.inOut' });
+    return;
+  }
+  state.autoSpin=false;
+  const midLon=(sp.breeding.lon+sp.wintering.lon)/2;
+  const midLat=(sp.breeding.lat+sp.wintering.lat)/2;
+  const targetSpin=shortest(state.spin, -(midLon+90)*DEG);
+  const polar=Math.min(150*DEG, Math.max(30*DEG,(90-midLat*0.75)*DEG));
+  // frame the route: short hops sit close, pole-to-pole routes pull right back
+  const radius=frameBase*(0.55+0.55*(sp.centralAngle/Math.PI));
+  gsap.to(state,{ spin:targetSpin, polar:polar, radius:radius, duration:1.5, ease:'power3.inOut' });
+}
+
+/* ==========================================================
+   8. Timeline (GSAP)
+   ========================================================== */
+const slider=document.getElementById('monthSlider');
+const fill=document.getElementById('fill');
+const dateOut=document.getElementById('dateOut');
+const sunOut=document.getElementById('sunOut');
+const playBtn=document.getElementById('playBtn');
+let playTween=null;
+
+function syncTime(){
+  slider.value=Math.round(state.month*100);
+  fill.style.width=(state.month/12*100)+'%';
+  dateOut.textContent=formatMonth(state.month);
+  const d=solarDeclination(state.month)/DEG;
+  sunOut.innerHTML='Sun overhead '+Math.abs(d).toFixed(1)+'&deg;'+(d>=0?'N':'S');
+}
+
+function startPlay(){
+  stopPlay(true);
+  const remaining=12-state.month;
+  playTween=gsap.to(state,{
+    month:12, duration:Math.max(0.4, remaining*2.2), ease:'none',
+    onComplete(){ state.month=0; startPlay(); }
+  });
+  playBtn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+  playBtn.setAttribute('aria-label','Pause the year');
+}
+function stopPlay(quiet){
+  if(playTween){ playTween.kill(); playTween=null; }
+  if(!quiet){
+    playBtn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"></polygon></svg>';
+    playBtn.setAttribute('aria-label','Play the year');
+  }
+}
+playBtn.addEventListener('click',()=>{ playTween ? stopPlay() : startPlay(); });
+slider.addEventListener('input',()=>{ stopPlay(); state.month=(+slider.value)/100; });
+syncTime();
+
+/* ==========================================================
+   9. Interaction: drag to spin, wheel to zoom
+   ========================================================== */
+let dragging=false, lastX=0, lastY=0;
+stage.addEventListener('pointerdown',e=>{
+  dragging=true; lastX=e.clientX; lastY=e.clientY;
+  stage.classList.add('dragging'); stage.setPointerCapture(e.pointerId);
+  gsap.killTweensOf(state,"spin,polar");
+  state.autoSpin=false;
+});
+stage.addEventListener('pointermove',e=>{
+  if(!dragging) return;
+  state.spin+=(e.clientX-lastX)*0.006;
+  state.polar=Math.min(160*DEG, Math.max(20*DEG, state.polar-(e.clientY-lastY)*0.005));
+  lastX=e.clientX; lastY=e.clientY;
+});
+['pointerup','pointercancel','pointerleave'].forEach(ev=>{
+  stage.addEventListener(ev,()=>{ dragging=false; stage.classList.remove('dragging'); });
+});
+stage.addEventListener('wheel',e=>{
+  e.preventDefault();
+  gsap.killTweensOf(state,"radius");
+  state.radius=Math.min(frameBase*1.9, Math.max(frameBase*0.36, state.radius+e.deltaY*0.0022*frameBase/5.7));
+},{passive:false});
+
+/* ==========================================================
+   10. Resize & render loop
+   ========================================================== */
+let W=0,H=0,shift=0;
+function resize(){
+  const r=stage.getBoundingClientRect();
+  W=r.width; H=r.height;
+  if(!renderer) return;
+  renderer.setSize(W,H);
+  const isNarrow=W<860;
+  // panels cover part of the stage: the sidebar on the right when wide, the
+  // bottom sheet plus timebar when narrow. Offset the projection by half of
+  // each so the earth sits centred in the area actually left visible.
+  const shiftX=isNarrow?0:164;
+  const shiftY=isNarrow?Math.round((H*0.46+74)/2):0;
+  shift=shiftX;
+  const fullW=W+2*shiftX, fullH=H+2*shiftY;
+  camera.aspect=fullW/fullH;
+  camera.setViewOffset(fullW,fullH,2*shiftX,2*shiftY,W,H);
+  camera.updateProjectionMatrix();
+
+  // the sphere has to fit the narrower of the two visible half-extents
+  const prevBase=frameBase;
+  frameBase=1.85*fullH/(Math.tan(FOV*DEG/2)*Math.min(W,H));
+  state.radius*=frameBase/prevBase;   // hold the framing across resize / rotation
+}
+window.addEventListener('resize',resize);
+resize();
+
+function updatePins(){
+  if(!selected||!renderer){ pinsLayer.innerHTML=''; pinsLayer._id=null; return; }
+  if(pinsLayer._id!==selected.id){
+    pinsLayer.innerHTML='';
+    [['Breeding',selected.breeding],['Wintering',selected.wintering]].forEach(([label,loc])=>{
+      const el=document.createElement('div');
+      el.className='pin';
+      el.style.setProperty('--pin-color',selected.color);
+      el.innerHTML='<span class="tag"><b>'+label+'</b> &middot; '+loc.name+'</span><span class="stem"></span>';
+      el._loc=loc;
+      pinsLayer.appendChild(el);
+    });
+    pinsLayer._id=selected.id;
+  }
+  Array.prototype.forEach.call(pinsLayer.children,el=>{
+    const world=lonLatToVec3(el._loc.lon,el._loc.lat,1.02).applyMatrix4(earthGroup.matrixWorld);
+    const v=world.clone().project(camera);
+    el.style.left=((v.x*0.5+0.5)*W)+'px';
+    el.style.top=((-v.y*0.5+0.5)*H)+'px';
+    el.style.opacity = world.dot(camera.position)>1.02 ? '1' : '0';
+  });
+}
+
+/* GSAP runs off this loop rather than its own ticker, so every tween advances
+   in lockstep with rendering even if the browser suspends the page. */
+if(window.gsap && gsap.ticker && gsap.updateRoot){
+  gsap.ticker.remove(gsap.updateRoot);
+}
+const t0=performance.now();
+let last=t0;
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  // GSAP runs on wall-clock time, so a tab backgrounded during the entrance
+  // resumes with it already finished rather than replaying it
+  const elapsed=(now-t0)/1000;
+  if(gsap.updateRoot) gsap.updateRoot(elapsed);
+
+  if(renderer){
+    if(state.autoSpin && !dragging) state.spin+=dt*0.055;
+    earthGroup.rotation.y=state.spin;
+
+    camera.position.set(
+      0,
+      state.radius*Math.cos(state.polar),
+      state.radius*Math.sin(state.polar)
+    );
+    camera.lookAt(0,0,0);
+
+    const decl=solarDeclination(state.month);
+    earthMat.uniforms.uSun.value.set(Math.cos(decl)*0.52, Math.sin(decl), Math.cos(decl)*0.85).normalize();
+
+    earthGroup.updateMatrixWorld();
+
+    SPECIES.forEach(sp=>{
+      // safety net: an entrance that stalls must never leave a route hidden
+      if(elapsed>3) sp.reveal=1;
+      const focus = !selected || selected.id===sp.id;
+      const pos=posAt(sp,state.month);
+      const next=posAt(sp,state.month+0.03);
+      const moving=Math.abs(next-pos)>0.0008;
+      const p=sp.curve.getPointAt(Math.min(1,Math.max(0,pos)));
+
+      const c=Math.floor(sp.indexCount*sp.reveal/3)*3;
+      sp.tube.geometry.setDrawRange(0, Math.max(3,c));
+
+      sp.tubeMat.opacity = (focus ? (selected?0.9:0.6) : 0.08) * sp.reveal;
+      sp.flock.position.copy(p);
+      sp.halo.position.copy(p);
+      const base=(selected&&focus)?0.105:0.075;
+      sp.flock.scale.setScalar(base*sp.pulse.s);
+      sp.halo.scale.setScalar((moving?base*2.1:base*2.9)*sp.pulse.s);
+      sp.flock.material.opacity = (focus?0.95:0.25)*sp.reveal;
+      sp.halo.material.opacity = (focus?(moving?0.26:0.19):0.06)*sp.reveal;
+    });
+
+    updatePins();
+    renderer.render(scene,camera);
+  }
+
+  syncTime();
+  // the sidebar only needs rebuilding when what it says actually changes
+  const stamp=(selected?selected.id:'all')+'|'+state.month.toFixed(2);
+  if(stamp!==lastInfoStamp){ lastInfoStamp=stamp; renderInfo(); }
+  requestAnimationFrame(frame);
+}
+
+/* ==========================================================
+   11. Entrance (GSAP)
+   ========================================================== */
+if(renderer){
+  requestAnimationFrame(frame);
+  if(!reduced){
+    const tl=gsap.timeline();
+    tl.from(state,{ radius:frameBase*1.62, duration:1.9, ease:'power2.out' },0);
+    SPECIES.forEach((sp,i)=>{
+      tl.from(sp,{ reveal:0, duration:0.9, ease:'power2.out' }, 0.3+i*0.09);
+    });
+    SPECIES.forEach((sp,i)=>{
+      gsap.to(sp.pulse,{ s:1.28, duration:1.1+i*0.07, repeat:-1, yoyo:true, ease:'sine.inOut', delay:i*0.15 });
+    });
+  }
+  renderInfo();
+}
+})();
+</script>
+<noscript>
+  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:40px;
+              background:#080b10;color:#93a8ae;font:16px/1.6 Georgia,serif;text-align:center;z-index:9999;">
+    Chasing the Sun is an interactive visualisation and needs JavaScript enabled to draw itself.
+  </div>
+</noscript>
+</body>
+</html>

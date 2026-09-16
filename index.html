@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Following Summer</title>
+<meta name="description" content="A three-part visualisation of bird migration: the family tree of who migrates, an atlas of where they go, and a globe showing the daylight they are chasing.">
+<meta name="theme-color" content="#080b10">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Following Summer">
+<meta property="og:title" content="Following Summer">
+<meta property="og:description" content="Three ways to watch a bird migrate: a phylogenetic tree, a flyway atlas, and a globe that turns with the seasons.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Following Summer">
+<meta name="twitter:description" content="Three ways to watch a bird migrate: a phylogenetic tree, a flyway atlas, and a globe that turns with the seasons.">
+<link rel="canonical" href="https://ellewitherow.github.io/flyway-atlas/">
+<meta property="og:url" content="https://ellewitherow.github.io/flyway-atlas/">
+<!-- Add 1200x630 screenshots at assets/og-*.png, then uncomment:
+<meta property="og:image" content="https://ellewitherow.github.io/flyway-atlas/assets/og-index.png">
+<meta name="twitter:image" content="https://ellewitherow.github.io/flyway-atlas/assets/og-index.png">
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#080b10;
+    --bg-2:#0d131a;
+    --panel:#0f151c;
+    --panel-border:#26343d;
+    --ink:#eef4f1;
+    --ink-dim:#93a8ae;
+    --ink-faint:#54666c;
+    --gold:#cfa15f;
+    --accent:#4fc7b3;
+    --serif-display:'Fraunces','Iowan Old Style','Palatino Linotype',serif;
+    --serif-body:'Newsreader','Iowan Old Style',Georgia,serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    color-scheme: dark;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  img{ max-width:100%; }
+  [hidden]{ display:none !important; }
+  body{
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 0%, rgba(47,158,143,0.10), transparent 70%),
+      linear-gradient(180deg,#0a0f16 0%, var(--bg) 45%, #05070a 100%);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:var(--serif-body);
+    min-height:100dvh;
+  }
+  .wrap{ max-width:1020px; margin:0 auto; padding:0 28px 80px; }
+
+  header.site{ padding:88px 0 56px; }
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 18px;
+  }
+  h1{
+    font-family:var(--serif-display); font-weight:500;
+    font-size:clamp(38px,6.4vw,68px); line-height:1.02; letter-spacing:-0.01em;
+    margin:0 0 22px; text-wrap:balance;
+  }
+  h1 em{ font-style:italic; font-weight:300; color:var(--gold); }
+  .lede{
+    font-size:clamp(16px,2vw,19px); line-height:1.62; color:var(--ink-dim);
+    max-width:62ch; margin:0;
+  }
+  .lede strong{ color:var(--ink); font-weight:500; }
+
+  /* ---- the three volumes ---- */
+  .volumes{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:1px;
+    background:var(--panel-border); border:1px solid var(--panel-border);
+    border-radius:12px; overflow:hidden; margin:0 0 64px;
+  }
+  .vol{
+    display:flex; flex-direction:column; gap:14px;
+    background:var(--panel); padding:26px 24px 24px;
+    text-decoration:none; color:inherit;
+    transition:background .2s ease;
+  }
+  .vol:hover{ background:#131b23; }
+  .vol:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .vol .mark{ color:var(--vol-color); }
+  .vol .num{
+    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  .vol h2{
+    font-family:var(--serif-display); font-weight:600; font-size:23px; line-height:1.15;
+    margin:0; text-wrap:balance;
+  }
+  .vol p{ font-size:14.5px; line-height:1.58; color:var(--ink-dim); margin:0; }
+  .vol .does{
+    font-family:var(--mono); font-size:10.5px; line-height:1.7; color:var(--ink-faint);
+    margin-top:auto; padding-top:14px; border-top:1px solid var(--panel-border);
+  }
+  .vol .open{
+    font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--vol-color);
+  }
+
+  /* ---- notes ---- */
+  .notes{ display:grid; grid-template-columns:1fr 1fr; gap:44px; margin-bottom:56px; }
+  .notes h3{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-faint); margin:0 0 14px; font-weight:500;
+  }
+  .notes p{ font-size:14.5px; line-height:1.65; color:var(--ink-dim); margin:0 0 12px; max-width:56ch; }
+  .notes p:last-child{ margin-bottom:0; }
+  .notes a{ color:var(--accent); text-decoration:none; border-bottom:1px solid rgba(79,199,179,.35); }
+  .notes a:hover{ border-bottom-color:var(--accent); }
+  .caveat{
+    border-left:2px solid var(--gold); padding:2px 0 2px 16px;
+    font-style:italic; color:var(--ink-dim);
+  }
+
+  footer.site{
+    border-top:1px solid var(--panel-border); padding-top:26px;
+    font-family:var(--mono); font-size:10.5px; line-height:1.9; letter-spacing:.03em;
+    color:var(--ink-faint);
+  }
+  footer.site a{ color:var(--ink-faint); text-decoration:none; border-bottom:1px solid #2a3742; }
+  footer.site a:hover{ color:var(--ink-dim); }
+
+  @media (max-width:860px){
+    .volumes{ grid-template-columns:1fr; }
+    .notes{ grid-template-columns:1fr; gap:34px; }
+    header.site{ padding:56px 0 40px; }
+    .wrap{ padding:0 20px 56px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .vol{ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="site">
+    <p class="eyebrow">A three-part visualisation</p>
+    <h1>Following <em>Summer</em></h1>
+    <p class="lede">Most migratory birds are not fleeing the cold. They are following daylight &mdash; and the food that daylight grows. These three pieces take the same six-to-eight lineages and ask three different questions of them: <strong>who</strong> migrates, <strong>where</strong> they go, and <strong>when</strong>, and why then.</p>
+  </header>
+
+  <nav class="volumes">
+
+    <a class="vol" href="tree.html" style="--vol-color:#cfa15f">
+      <span class="mark" aria-hidden="true">
+        <svg width="46" height="34" viewBox="0 0 46 34" fill="none">
+          <path d="M23 33 L23 24" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M23 24 C 23 17, 11 16, 8 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".75"/>
+          <path d="M23 24 C 23 16, 23 14, 23 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".75"/>
+          <path d="M23 24 C 23 17, 35 16, 38 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".75"/>
+          <circle cx="8" cy="7" r="2.4" fill="#5c6f78"/>
+          <circle cx="23" cy="5" r="2.4" fill="#35a7c9"/>
+          <circle cx="38" cy="7" r="2.4" fill="#ff6a4d"/>
+        </svg>
+      </span>
+      <span class="num">Vol. I &mdash; Who</span>
+      <h2>Canopy of Migration</h2>
+      <p>The bird family tree as a rotating 3D canopy, from the flightless ratites at one edge to the Arctic Tern at the other. Colour runs from sedentary to extreme-endurance.</p>
+      <span class="does">Drag to orbit &middot; click a clade for its strategy</span>
+      <span class="open">Open Vol. I &rarr;</span>
+    </a>
+
+    <a class="vol" href="atlas.html" style="--vol-color:#35a7c9">
+      <span class="mark" aria-hidden="true">
+        <svg width="46" height="34" viewBox="0 0 46 34" fill="none">
+          <path d="M3 25 H43" stroke="#26343d" stroke-width="1.2"/>
+          <path d="M3 14 H43" stroke="#26343d" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M8 25 C 14 4, 32 4, 38 25" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="8" cy="25" r="2.6" fill="#e0a23c"/>
+          <circle cx="38" cy="25" r="2.6" fill="currentColor"/>
+          <circle cx="23" cy="9.5" r="3.4" fill="currentColor" opacity=".35"/>
+        </svg>
+      </span>
+      <span class="num">Vol. II &mdash; Where</span>
+      <h2>Flyway Atlas</h2>
+      <p>Six species plotted on a world map, each moving along its own flyway as you scrub through the calendar &mdash; a radar-style read on where every population sits today.</p>
+      <span class="does">Scrub the year &middot; isolate a single flyway</span>
+      <span class="open">Open Vol. II &rarr;</span>
+    </a>
+
+    <a class="vol" href="globe.html" style="--vol-color:#4fc7b3">
+      <span class="mark" aria-hidden="true">
+        <svg width="46" height="34" viewBox="0 0 46 34" fill="none">
+          <circle cx="23" cy="17" r="13" fill="#101820"/>
+          <path d="M23 4 A 13 13 0 0 1 23 30 A 9 13 0 0 0 23 4" fill="#cfa15f" opacity=".22"/>
+          <circle cx="23" cy="17" r="13" stroke="#2f3f4a" stroke-width="1.2"/>
+          <ellipse cx="23" cy="17" rx="5.6" ry="13" stroke="#2f3f4a" stroke-width="1"/>
+          <path d="M10 17 H36" stroke="#2f3f4a" stroke-width="1"/>
+          <path d="M16 28 C 12 18, 26 8, 32 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="32" cy="7" r="2.6" fill="currentColor"/>
+        </svg>
+      </span>
+      <span class="num">Vol. III &mdash; When</span>
+      <h2>Chasing the Sun</h2>
+      <p>The same six routes as true great circles on a WebGL globe, lit by a day/night terminator that moves with the date &mdash; so you can watch daylight pool at one pole, then the other.</p>
+      <span class="does">Spin the earth &middot; play the year &middot; read daylight hours</span>
+      <span class="open">Open Vol. III &rarr;</span>
+    </a>
+
+  </nav>
+
+  <section class="notes">
+    <div>
+      <h3>About the data</h3>
+      <p class="caveat">These are modelled illustrations built from published satellite-tracking and range studies &mdash; not a live radar or telemetry feed.</p>
+      <p>Breeding and wintering locations, route shapes, and migration windows follow the published literature for each species; positions between those anchor points are interpolated, not observed. Daylight hours are computed from real solar declination for the selected date, so those figures are genuine astronomy.</p>
+      <p>For live nocturnal migration radar over North America, see <a href="https://birdcast.info" rel="noopener">BirdCast</a>; for observation records, <a href="https://ebird.org" rel="noopener">eBird</a>.</p>
+    </div>
+    <div>
+      <h3>How it is built</h3>
+      <p>Three self-contained HTML pages, no build step and no framework. Vol. I and II render to 2D canvas with hand-rolled projection; Vol. III uses <a href="https://threejs.org" rel="noopener">Three.js</a> with a custom GLSL shader for the terminator, and <a href="https://gsap.com" rel="noopener">GSAP</a> for camera flights and the year timeline.</p>
+      <p>The globe's earth texture is painted at runtime from coastline outlines rather than loaded as an image, so the whole site ships without a single binary asset.</p>
+      <p>Everything works from a plain static host. Drop the folder anywhere that serves files.</p>
+    </div>
+  </section>
+
+  <footer class="site">
+    Following Summer &mdash; a three-part visualisation of bird migration<br>
+    Built with <a href="https://threejs.org" rel="noopener">Three.js</a> (MIT) and <a href="https://gsap.com" rel="noopener">GSAP</a>. Type set in Fraunces, Newsreader and IBM Plex Mono via <a href="https://fonts.google.com" rel="noopener">Google Fonts</a> (OFL).<br>
+    Routes modelled from published tracking studies. Not a live data feed.
+  </footer>
+
+</div>
+</body>
+</html>
