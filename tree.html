@@ -67,6 +67,7 @@
 
   .stage{
     position:relative;
+    z-index:0; /* contain the node labels' z-indices so overlays and the panel sit above them */
     width:100%;
     height:100dvh;
     background:
@@ -137,7 +138,9 @@
     letter-spacing:.06em;
     text-transform:uppercase;
     color:var(--label-color, var(--ink-dim));
-    text-shadow:0 0 8px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
+    /* stacked halo: labels sit on the ends of thick limbs, so they need
+       their own patch of dark to stay legible */
+    text-shadow:0 0 2px var(--bg), 0 0 5px var(--bg), 0 0 10px var(--bg), 0 0 16px var(--bg);
   }
   .node-btn.structural .label{
     color:var(--gold);
@@ -150,7 +153,7 @@
     font-style:italic;
     font-size:11.5px;
     color:var(--ink-faint);
-    text-shadow:0 0 8px rgba(0,0,0,0.9);
+    text-shadow:0 0 2px var(--bg), 0 0 6px var(--bg), 0 0 12px var(--bg);
   }
 
   /* ---------- Masthead ---------- */
@@ -230,6 +233,28 @@
     font-style:italic;
     line-height:1.4;
   }
+  .legend h2.legend-sub{ margin:14px 0 8px; padding-top:12px; border-top:1px solid var(--panel-border); }
+  .thick-key{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:4px;
+  }
+  .thick-key .tk{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  /* each sample is drawn at the exact width a branch of that size gets at
+     mid-depth: a translucent sheath with a bright core, like the limbs */
+  .thick-key i{
+    position:relative; display:block; height:36px;
+    border-radius:999px;
+    background:rgba(238,244,241,0.2);
+  }
+  .thick-key i::after{
+    content:""; position:absolute; top:0; bottom:0; left:50%;
+    width:var(--core, 1.4px); transform:translateX(-50%);
+    border-radius:999px;
+    background:rgba(238,244,241,0.85);
+  }
+  .thick-key b{
+    font-family:var(--mono); font-weight:500; font-size:9.5px;
+    color:var(--ink-faint); letter-spacing:.02em;
+  }
 
   /* ---------- Controls / hint ---------- */
   .controls{
@@ -306,6 +331,15 @@
     color:var(--gold);
     margin:0 0 18px;
   }
+  .panel .species{ margin:-8px 0 18px; }
+  .panel .count{
+    font-family:var(--mono); font-size:12px; letter-spacing:.03em;
+    color:var(--ink); margin:0;
+  }
+  .panel .count-note{
+    font-family:var(--mono); font-size:10.5px; line-height:1.55;
+    color:var(--ink-faint); margin:4px 0 0;
+  }
   .panel p.desc{
     font-size:15.5px;
     line-height:1.62;
@@ -331,11 +365,19 @@
     .legend{ left:16px; bottom:16px; padding:10px 12px 10px; max-width:180px; width:170px; }
     .legend-labels span:nth-child(2){ display:none; }
     .legend-note{ display:none; }
+    .legend h2.legend-sub{ margin-top:10px; padding-top:9px; }
+    .thick-key i{ height:26px; }
     .controls{ right:16px; bottom:16px; }
     .hint{ display:none; }
     .panel{ width:100%; height:66%; top:auto; bottom:0; border-left:0; border-top:1px solid var(--panel-border); border-radius:16px 16px 0 0; transform:translateY(100%); padding:20px 22px 22px; }
     .panel.open{ transform:translateY(0); }
     .panel h3{ font-size:22px; }
+  }
+
+  /* short landscape windows: keep the (taller) legend clear of the masthead */
+  @media (max-height: 620px) and (min-width: 721px){
+    .legend-note{ display:none; }
+    .thick-key i{ height:26px; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -359,7 +401,7 @@
 <div class="masthead">
   <p class="eyebrow"><a class="home-link" href="index.html">Following Summer</a> &middot; Vol. I &middot; Neornithes</p>
   <h1>The Canopy of <em>Migration</em></h1>
-  <p>Every branch of the bird family tree adapted to flight - or abandoned it - on its own terms. Colour traces how far each lineage now travels, from grounded ratites to the Arctic Tern's pole-to-pole circuit. Drag the canopy to turn it; click a branch to read its strategy.</p>
+  <p>Every branch of the bird family tree adapted to flight - or abandoned it - on its own terms. Colour traces how far each lineage now travels, from grounded ratites to the Arctic Tern's pole-to-pole circuit; thickness, how many species it holds. Drag the canopy to turn it; click a branch to read its strategy.</p>
 </div>
 
 <div class="legend">
@@ -369,6 +411,9 @@
     <span>Sedentary</span><span>Flyway</span><span>Endurance</span>
   </div>
   <p class="legend-note">Gold-ringed nodes mark ancestral clades, not migratory data.</p>
+  <h2 class="legend-sub">Species per branch</h2>
+  <div class="thick-key" id="thickKey" aria-hidden="true"></div>
+  <p class="legend-note">A branch's cross-section is proportional to the species in its clade (AviList 2025).</p>
 </div>
 
 <div class="controls">
@@ -384,6 +429,10 @@
   <span class="panel-tag" id="pTag"></span>
   <h3 id="pName"></h3>
   <p class="common-name" id="pCommon"></p>
+  <div class="species">
+    <p class="count" id="pCount"></p>
+    <p class="count-note" id="pCountNote" hidden></p>
+  </div>
   <p class="desc" id="pDesc"></p>
   <div class="stat" id="pStat" hidden><span>In the field</span><div id="pStatText"></div></div>
 </aside>
@@ -411,70 +460,77 @@
 
   const deg = Math.PI/180;
 
+  // species: living species in the clade, summed from the order counts in
+  // AviList v2025b (June 2026), https://www.avilist.org/checklist/
+  // Each branch is drawn with a cross-section proportional to this number.
   const nodes = [
-    { id:"root", parent:null, level:0, angle:0, radius:0, y:225,
+    { id:"root", parent:null, level:0, angle:0, radius:0, y:225, species:11131,
+      speciesNote:"All 46 orders. The trunk below this node carries every one of them.",
       name:"Neornithes", common:"All living birds", structural:true,
       clade:"Crown clade", tag:"Common ancestor",
       desc:"Every bird alive today descends from a single Cretaceous lineage. How each branch kept, modified, or abandoned powered flight set the template for how far - and how often - its descendants would come to travel." },
 
-    { id:"palaeo", parent:"root", level:1, angle:200*deg, radius:165, y:55,
+    { id:"palaeo", parent:"root", level:1, angle:200*deg, radius:165, y:55, species:59,
       name:"Palaeognathae", common:"Ratites & Tinamous", structural:true,
       clade:"Basal lineage", tag:"Ancestral clade",
       desc:"The oldest living split in the bird tree. Most of its members are flightless or nearly so - an evolutionary trade of range for size and ground-dwelling stability." },
 
-    { id:"gallo", parent:"root", level:1, angle:320*deg, radius:165, y:70,
+    { id:"gallo", parent:"root", level:1, angle:320*deg, radius:165, y:70, species:483,
       name:"Galloanserae", common:"Fowl & Waterfowl", structural:true,
       clade:"Basal lineage", tag:"Ancestral clade",
       desc:"A lineage split cleanly by wing loading and habitat: waterfowl built for sustained high-altitude flight, and game birds built for a single explosive escape." },
 
-    { id:"neoaves", parent:"root", level:1, angle:70*deg, radius:160, y:45,
+    { id:"neoaves", parent:"root", level:1, angle:70*deg, radius:160, y:45, species:10589,
+      speciesNote:"39 orders, 4 drawn here (7,715 species). The thickness counts all 39: parrots, woodpeckers, pigeons, hawks and owls make up much of the rest.",
       name:"Neoaves", common:"Modern Flying Birds", structural:true,
       clade:"Ancestral lineage", tag:"Ancestral clade",
-      desc:"Over 60% of living bird species belong here. Its radiations produced the most extreme migratory specialists on the planet, from nocturnal songbird navigators to pelagic wanderers that barely touch land." },
+      desc:"About 95% of living bird species belong here. Its radiations produced the most extreme migratory specialists on the planet, from nocturnal songbird navigators to pelagic wanderers that barely touch land." },
 
     // Palaeognathae leaves
-    { id:"ratites", parent:"palaeo", level:2, angle:188*deg, radius:335, y:-140,
+    { id:"ratites", parent:"palaeo", level:2, angle:188*deg, radius:335, y:-140, species:13,
+      speciesNote:"Ostriches 2, rheas 2, emu and cassowaries 4, kiwis 5.",
       name:"Ratites", common:"Ostriches, Rheas, Emus, Kiwis", intensity:0.05,
       clade:"Palaeognathae", tag:"Sedentary - flightless",
       desc:"Completely sedentary due to flightlessness; movement is strictly nomadic or seasonal, tracking rainfall and food across a local range rather than migrating on any fixed schedule." },
 
-    { id:"tinamous", parent:"palaeo", level:2, angle:216*deg, radius:330, y:-125,
+    { id:"tinamous", parent:"palaeo", level:2, angle:216*deg, radius:330, y:-125, species:46,
       name:"Tinamous", common:"Tinamidae", intensity:0.08,
       clade:"Palaeognathae", tag:"Non-migratory",
       desc:"Ground-dwelling weak fliers restricted to Central and South America. They neither migrate nor disperse far - their short, rounded wings favour a brief burst of escape flight over sustained travel." },
 
     // Galloanserae leaves
-    { id:"anseriformes", parent:"gallo", level:2, angle:306*deg, radius:340, y:-155,
+    { id:"anseriformes", parent:"gallo", level:2, angle:306*deg, radius:340, y:-155, species:176,
       name:"Anseriformes", common:"Ducks, Geese, Swans", intensity:0.8,
       clade:"Galloanserae", tag:"Highly migratory - flyway specialist",
       desc:"Highly migratory along structured flyways such as the Mississippi and East Asian-Australasian corridors. Long-distance, high-energy V-formation flight lets them exploit seasonal Arctic and temperate wetlands thousands of kilometres apart.",
       stat:"Travels fixed continental flyways in coordinated V-formation." },
 
-    { id:"galliformes", parent:"gallo", level:2, angle:334*deg, radius:325, y:-110,
+    { id:"galliformes", parent:"gallo", level:2, angle:334*deg, radius:325, y:-110, species:307,
       name:"Galliformes", common:"Pheasants, Quail, Grouse", intensity:0.2,
       clade:"Galloanserae", tag:"Sedentary / short-distance",
       desc:"Predominantly sedentary or short-distance altitudinal migrants. Heavy bodies and short, rounded wings suit an explosive escape flight rather than sustained cross-country travel." },
 
     // Neoaves leaves
-    { id:"passerines", parent:"neoaves", level:2, angle:38*deg, radius:345, y:-165,
+    { id:"passerines", parent:"neoaves", level:2, angle:38*deg, radius:345, y:-165, species:6705,
       name:"Passerines", common:"Songbirds", intensity:0.65,
       clade:"Neoaves", tag:"Long-distance migrant",
       desc:"Over half of all bird species. Many lineages - warblers, thrushes, flycatchers - perform long-distance nocturnal transcontinental migrations across Neotropical-Nearctic and Palearctic-Afrotropical systems, navigating by stellar cues and geomagnetic fields.",
       stat:">50% of all living bird species; navigation by stars and magnetic field." },
 
-    { id:"charadriiformes", parent:"neoaves", level:2, angle:63*deg, radius:335, y:-135,
+    { id:"charadriiformes", parent:"neoaves", level:2, angle:63*deg, radius:335, y:-135, species:392,
       name:"Charadriiformes", common:"Shorebirds & Gulls", intensity:1.0,
       clade:"Neoaves", tag:"Extreme-endurance migrant",
       desc:"Home to the planet's extreme long-distance endurance migrants: the Arctic Tern, which travels up to 90,000 km a year from the Arctic to the Antarctic, and the Bar-tailed Godwit, capable of non-stop trans-Pacific flights exceeding 11,000 km.",
       stat:"Arctic Tern: ~90,000 km/yr - Bar-tailed Godwit: 11,000+ km non-stop." },
 
-    { id:"procellariiformes", parent:"neoaves", level:2, angle:88*deg, radius:340, y:-150,
+    { id:"procellariiformes", parent:"neoaves", level:2, angle:88*deg, radius:340, y:-150, species:146,
       name:"Procellariiformes", common:"Albatrosses & Petrels", intensity:0.85,
       clade:"Neoaves", tag:"Pelagic nomad",
       desc:"Tubenosed pelagic wanderers that dynamic-soar over ocean currents, roaming tens of thousands of kilometres across entire ocean basins rather than following any fixed breeding-to-wintering corridor.",
       stat:"Dynamic soaring; no fixed corridor - ranges across whole ocean basins." },
 
-    { id:"apodiformes", parent:"neoaves", level:2, angle:112*deg, radius:330, y:-115,
+    { id:"apodiformes", parent:"neoaves", level:2, angle:112*deg, radius:330, y:-115, species:472,
+      speciesNote:"Hummingbirds 363, swifts 105, treeswifts 4.",
       name:"Apodiformes", common:"Swifts & Hummingbirds", intensity:0.78,
       clade:"Neoaves", tag:"Extreme-endurance migrant (small-bodied)",
       desc:"Swifts stay airborne for months at a stretch during the non-breeding season, while hummingbirds such as the Ruby-throated perform non-stop Gulf of Mexico crossings despite a body mass of only a few grams.",
@@ -519,6 +575,32 @@
   const FOCAL = 900;
   const CAM_OFFSET = 640;
 
+  // Branch thickness. Cross-section area is proportional to species count,
+  // so drawn width goes with its square root - the way a real tree's limbs
+  // scale. (Linear width would leave the 13 ratites a 0.03px hairline.)
+  const ALL_SPECIES = 11131;
+  const TRUNK_WORLD = 40;                       // world-space width carrying every living species
+  const MID_SCALE = FOCAL/(FOCAL+CAM_OFFSET);   // perspective scale at mid-depth
+  const TRUNK_DROP = 95;                        // how far the trunk runs below the root
+  function worldWidth(species){ return TRUNK_WORLD*Math.sqrt(species/ALL_SPECIES); }
+
+  // Legend key: sample widths drawn exactly as a branch at mid-depth.
+  (function buildThicknessKey(){
+    const key = document.getElementById('thickKey');
+    [10, 100, 1000, 10000].forEach(n=>{
+      const w = worldWidth(n)*MID_SCALE;
+      const tk = document.createElement('span');
+      tk.className = 'tk';
+      const bar = document.createElement('i');
+      bar.style.width = w.toFixed(2)+'px';
+      bar.style.setProperty('--core', Math.min(w, 1.4).toFixed(2)+'px');
+      const lab = document.createElement('b');
+      lab.textContent = n.toLocaleString('en-US');
+      tk.append(bar, lab);
+      key.appendChild(tk);
+    });
+  })();
+
   let rotY = 0.3;
   let autoSpin = true;
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -558,7 +640,7 @@
     btn.style.setProperty('--label-color', n.structural ? 'var(--gold)' : n.color);
     btn.innerHTML = `<span class="dot"></span><span class="label">${n.name}</span>` +
       (!n.structural ? `<span class="common">${n.common}</span>` : '');
-    btn.setAttribute('aria-label', `${n.name} - ${n.common}`);
+    btn.setAttribute('aria-label', `${n.name} - ${n.common}, ${n.species.toLocaleString('en-US')} species`);
     btn.addEventListener('click', ()=> openPanel(n.id));
     nodesLayer.appendChild(btn);
     els[n.id] = btn;
@@ -574,8 +656,23 @@
     ctx.moveTo(p1.sx,p1.sy);
     ctx.quadraticCurveTo(midx,midy,p2.sx,p2.sy);
     ctx.strokeStyle = grad;
-    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
     ctx.shadowColor = colorB;
+    // A translucent sheath at the full width carries the species count; a
+    // bright filament down the middle keeps thick limbs reading as light.
+    const core = Math.min(width, 1.4);
+    if(width > core){
+      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = width;
+      ctx.shadowBlur = 14;
+      ctx.stroke();
+      ctx.globalAlpha = 0.26;
+      ctx.lineWidth = width*0.5;
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = core;
     ctx.shadowBlur = 10;
     ctx.stroke();
   }
@@ -604,16 +701,24 @@
       ctx.fill();
     });
 
-    // draw branches sorted back-to-front by average z
+    // trunk: every living species, fading down into deep time
+    const root = byId.root, pr = proj.root;
+    const foot = project(root.baseX, root.y + TRUNK_DROP, root.baseZ);
+    drawBranch(foot, pr, 'rgba(207,161,95,0)', root.color,
+      worldWidth(root.species)*(foot.scale+pr.scale)/2);
+
+    // draw branches sorted back-to-front by average z; each is as thick as
+    // the clade it leads to is species-rich
     const edges = nodes.filter(n=>n.parent).map(n=>({from:n.parent,to:n.id}));
     edges.sort((a,b)=> (proj[a.from].z+proj[a.to].z) - (proj[b.from].z+proj[b.to].z));
     edges.forEach(e=>{
       const nTo = byId[e.to];
       const p1 = proj[e.from], p2 = proj[e.to];
-      const w = nTo.level===1 ? 3.2 : 1.6;
+      const w = worldWidth(nTo.species)*(p1.scale+p2.scale)/2;
       drawBranch(p1,p2, byId[e.from].color, nTo.color, w);
     });
     ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
 
     // position DOM nodes, depth-sorted via z-index, faded when far
     const order = nodes.slice().sort((a,b)=> proj[a.id].z - proj[b.id].z);
@@ -679,6 +784,13 @@
     document.getElementById('pTag').style.setProperty('--tag-color', n.color);
     document.getElementById('pName').textContent = n.name;
     document.getElementById('pCommon').textContent = n.common;
+    const share = n.id==='root' ? 'every living bird'
+      : `${(100*n.species/ALL_SPECIES).toFixed(1)}% of living birds`;
+    document.getElementById('pCount').textContent =
+      `${n.species.toLocaleString('en-US')} species · ${share}`;
+    const noteEl = document.getElementById('pCountNote');
+    noteEl.hidden = !n.speciesNote;
+    noteEl.textContent = n.speciesNote || '';
     document.getElementById('pDesc').textContent = n.desc;
     const statEl = document.getElementById('pStat');
     if(n.stat){ statEl.hidden = false; document.getElementById('pStatText').textContent = n.stat; }

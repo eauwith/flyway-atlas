@@ -6,7 +6,7 @@ no framework, no binary assets.
 | Page | What it shows |
 |------|---------------|
 | `index.html` | Landing page tying the three volumes together |
-| `tree.html` | **Vol. I — Canopy of Migration.** The bird family tree as a rotating 3D canopy, coloured by migratory intensity |
+| `tree.html` | **Vol. I — Canopy of Migration.** The bird family tree as a rotating 3D canopy, coloured by migratory intensity, with each branch as thick as its clade is species-rich |
 | `atlas.html` | **Vol. II — Flyway Atlas.** Six species on a world map, moving along their flyways as you scrub the year |
 | `globe.html` | **Vol. III — Chasing the Sun.** The same routes as great circles on a WebGL globe, with a day/night terminator that moves with the date |
 
